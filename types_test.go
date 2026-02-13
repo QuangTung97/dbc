@@ -38,3 +38,17 @@ type tableTest03 struct {
 func (tableTest03) TableName() string {
 	return "table_test03"
 }
+
+// ------------------------------
+
+type tableTest04 struct {
+	RoleID    testRoleID `db:"role_id"`
+	Username  string     `db:"username"`
+	Age       int        `db:"age"`
+	Desc      string     `db:"desc"`
+	CreatedAt time.Time  `db:"created_at"`
+}
+
+func (tableTest04) TableName() string {
+	return "table_test04"
+}

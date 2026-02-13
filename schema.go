@@ -11,7 +11,7 @@ type Schema[T TableNamer] struct {
 	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
-	primaryKeyType primaryKeyType
+	primaryKeyType primaryKeyType // TODO delete
 }
 
 // ========================================
@@ -138,13 +138,15 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 	def := s.getDef()
 
 	offset := unsafePointerSub(fieldPtr, def.tableAddr)
-	_, ok := def.fieldOffsetMap[offset]
+	fieldType, ok := def.fieldOffsetMap[offset]
 	if !ok {
 		// TODO testing
 		panicFormat("TODO invalid")
 	}
 
-	// TODO if already get => panic
+	if _, existed := def.checkedFields[offset]; existed {
+		panicFormat("field '%s' in type '%s' has already been specified", fieldType.Name, s.getTableType())
+	}
 
 	def.checkedFields[offset] = struct{}{}
 	return offset
@@ -168,6 +170,15 @@ func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
 	offset := doSchemaIDInt64(s, field)
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.isAutoInc = true
+	})
+}
+
+func SchemaCompositePrimaryKey[T TableNamer, F any](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	s.primaryKeyType = primaryKeyNonInt
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isPrimaryKey = true
+		info.specType = fieldSpecConst
 	})
 }
 
@@ -196,20 +207,4 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.specType = fieldSpecIgnored
 	})
-}
-
-// ==========================================
-// Private Functions for Query Builder
-// ==========================================
-
-func (s *Schema[T]) getAllColumns() []string {
-	result := make([]string, 0, len(s.allFields))
-	for _, offset := range s.allFields {
-		info := s.fieldInfos[offset]
-		if !info.specType.isVisible() {
-			continue
-		}
-		result = append(result, info.dbName)
-	}
-	return result
 }

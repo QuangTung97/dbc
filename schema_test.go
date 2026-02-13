@@ -33,7 +33,7 @@ func TestRegisterSchema_Not_Found_Struct_Tag_DB(t *testing.T) {
 
 func TestRegisterSchema_Normal(t *testing.T) {
 	newTestSchema(t)
-	s := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+	RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
 		SchemaIDInt64(s, &table.ID)
 		SchemaConst(s, &table.RoleID)
 
@@ -43,8 +43,6 @@ func TestRegisterSchema_Normal(t *testing.T) {
 		SchemaIgnore(s, &table.CreatedAt)
 		SchemaIgnore(s, &table.UpdatedAt)
 	})
-
-	assert.Equal(t, []string{"id", "role_id", "username", "age"}, s.getAllColumns())
 }
 
 func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
@@ -59,6 +57,35 @@ func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
 
 			SchemaIgnore(s, &table.CreatedAt)
 			SchemaIgnore(s, &table.UpdatedAt)
+		})
+	})
+}
+
+func TestRegisterSchema_Composite_Primary_Key__Normal(t *testing.T) {
+	newTestSchema(t)
+	RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
+		SchemaCompositePrimaryKey(s, &table.RoleID)
+		SchemaCompositePrimaryKey(s, &table.Username)
+
+		SchemaEditable(s, &table.Age)
+		SchemaEditable(s, &table.Desc)
+
+		SchemaIgnore(s, &table.CreatedAt)
+	})
+}
+
+func TestRegisterSchema_Duplicated_Definition(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(t, "field 'Age' in type 'dbc.tableTest04' has already been specified", func() {
+		RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
+			SchemaCompositePrimaryKey(s, &table.RoleID)
+			SchemaCompositePrimaryKey(s, &table.Username)
+
+			SchemaEditable(s, &table.Age)
+			SchemaConst(s, &table.Age) // failed
+			SchemaEditable(s, &table.Desc)
+
+			SchemaIgnore(s, &table.CreatedAt)
 		})
 	})
 }

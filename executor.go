@@ -64,10 +64,11 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	return NullGet[T](ctx, buf.String(), args...)
 }
 
+// TODO get with lock
+
 func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primaryKeys []string) {
 	for index, keyCol := range primaryKeys {
 		if index > 0 {
-			// TODO testing
 			buf.WriteString(" AND ")
 		}
 		buf.WriteString(e.quoteIdent(keyCol))
@@ -119,14 +120,54 @@ func (e *Executor[T]) buildPlaceholderLen(buf *strings.Builder, size int) {
 	buf.WriteString(")")
 }
 
+func (e *Executor[T]) buildPlaceholderTwoLevels(
+	buf *strings.Builder, numInner int, numOuter int,
+) {
+	buf.WriteString("(")
+	for y := range numOuter {
+		if y > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString("(")
+		for x := range numInner {
+			if x > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString("?")
+		}
+		buf.WriteString(")")
+	}
+	buf.WriteString(")")
+}
+
+func (e *Executor[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string) {
+	buf.WriteString("(")
+	for index, col := range cols {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(col))
+	}
+	buf.WriteString(")")
+}
+
 func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
+	if len(idList) == 0 {
+		return nil, nil
+	}
+
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
 
-	// build where cond, TODO handle primary key multi column
-	buf.WriteString(e.quoteIdent(primaryKeys[0]))
-	buf.WriteString(" IN ")
-	e.buildPlaceholderLen(&buf, len(idList))
+	if len(primaryKeys) > 1 {
+		e.buildWhereInMultiCols(&buf, primaryKeys)
+		buf.WriteString(" IN ")
+		e.buildPlaceholderTwoLevels(&buf, len(primaryKeys), len(idList))
+	} else {
+		buf.WriteString(e.quoteIdent(primaryKeys[0]))
+		buf.WriteString(" IN ")
+		e.buildPlaceholderLen(&buf, len(idList))
+	}
 
 	// build args
 	getFunc := e.getValuesOfEntity(primaryOffsets)

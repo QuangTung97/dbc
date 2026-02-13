@@ -14,7 +14,8 @@ type executorTest struct {
 	Transaction
 	ctx context.Context
 
-	schema *Schema[tableTest03]
+	schema       *Schema[tableTest03]
+	schemaTable4 *Schema[tableTest04]
 
 	execQueries []string
 	execArgs    [][]any
@@ -50,11 +51,29 @@ func newExecTest(_ *testing.T) *executorTest {
 		SchemaIgnore(s, &table.UpdatedAt)
 	})
 
+	e.schemaTable4 = RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
+		SchemaCompositePrimaryKey(s, &table.RoleID)
+		SchemaCompositePrimaryKey(s, &table.Username)
+
+		SchemaEditable(s, &table.Age)
+		SchemaEditable(s, &table.Desc)
+
+		SchemaIgnore(s, &table.CreatedAt)
+	})
+
 	return e
 }
 
 func (e *executorTest) newExec() *Executor[tableTest03] {
 	exec, err := NewExecutor(DialectMysql, e.schema)
+	if err != nil {
+		panic(err)
+	}
+	return exec
+}
+
+func (e *executorTest) newExecTable04() *Executor[tableTest04] {
+	exec, err := NewExecutor(DialectMysql, e.schemaTable4)
 	if err != nil {
 		panic(err)
 	}
@@ -86,8 +105,13 @@ func (e *executorTest) GetContext(
 ) error {
 	e.getQueries = append(e.getQueries, query)
 	e.getArgs = append(e.getArgs, args)
-	val := dest.(*tableTest03)
-	*val = e.getResult
+
+	// set result
+	val, ok := dest.(*tableTest03)
+	if ok {
+		*val = e.getResult
+	}
+
 	return nil
 }
 
@@ -191,7 +215,7 @@ func TestExecutor_MySQL__Update(t *testing.T) {
 		Age:      31,
 	}
 
-	// do insert
+	// do update
 	err := exec.Update(e.ctx, entity)
 	assert.Equal(t, nil, err)
 
@@ -223,7 +247,7 @@ func TestExecutor_MySQL__Delete(t *testing.T) {
 		ID: 11,
 	}
 
-	// do insert
+	// do delete
 	err := exec.Delete(e.ctx, entity)
 	assert.Equal(t, nil, err)
 
@@ -257,7 +281,7 @@ func TestExecutor_MySQL__GetByID(t *testing.T) {
 		Username: "user01",
 	}
 
-	// do insert
+	// do get
 	nullUser, err := exec.GetByID(e.ctx, entity)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, null.New(e.getResult), nullUser)
@@ -289,7 +313,7 @@ func TestExecutor_MySQL__GetMulti(t *testing.T) {
 	entity2 := tableTest03{ID: 12}
 	entity3 := tableTest03{ID: 13}
 
-	// do insert
+	// do get multi
 	userList, err := exec.GetMulti(e.ctx, []tableTest03{entity1, entity2, entity3})
 	assert.Equal(t, nil, err)
 	assert.Equal(t, []tableTest03(nil), userList)
@@ -309,4 +333,83 @@ func TestExecutor_MySQL__GetMulti(t *testing.T) {
 	// check args
 	assert.Equal(t, 1, len(e.selectArgs))
 	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.selectArgs[0])
+}
+
+func TestExecutor_MySQL__Empty(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do get multi
+	userList, err := exec.GetMulti(e.ctx, nil)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, []tableTest03(nil), userList)
+
+	// check query
+	assert.Equal(t, 0, len(e.selectQueries))
+	// check args
+	assert.Equal(t, 0, len(e.selectArgs))
+}
+
+func TestExecutor_MySQL__GetByID__Composite_Key(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecTable04()
+
+	entity := tableTest04{
+		RoleID:   21,
+		Username: "user01",
+	}
+
+	// do get
+	_, err := exec.GetByID(e.ctx, entity)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.getQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `role_id`, `username`, `age`, `desc`",
+			"FROM `table_test04`",
+			"WHERE `role_id` = ? AND `username` = ?",
+		),
+		e.getQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.getArgs))
+	assert.Equal(t, []any{entity.RoleID, entity.Username}, e.getArgs[0])
+}
+
+func TestExecutor_MySQL__GetMulti__Composite_Key(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecTable04()
+
+	entity1 := tableTest04{RoleID: 21, Username: "user01"}
+	entity2 := tableTest04{RoleID: 22, Username: "user02"}
+	entity3 := tableTest04{RoleID: 23, Username: "user03"}
+
+	// do get multi
+	userList, err := exec.GetMulti(e.ctx, []tableTest04{entity1, entity2, entity3})
+	assert.Equal(t, nil, err)
+	assert.Equal(t, []tableTest04(nil), userList)
+
+	// check query
+	assert.Equal(t, 1, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `role_id`, `username`, `age`, `desc`",
+			"FROM `table_test04`",
+			"WHERE (`role_id`, `username`) IN ((?, ?), (?, ?), (?, ?))",
+		),
+		e.selectQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.selectArgs))
+	assert.Equal(t, []any{
+		entity1.RoleID, entity1.Username,
+		entity2.RoleID, entity2.Username,
+		entity3.RoleID, entity3.Username,
+	}, e.selectArgs[0])
 }
