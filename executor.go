@@ -146,6 +146,41 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 
 // TODO update multi
 
+func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
+	var buf strings.Builder
+	buf.WriteString("DELETE FROM ")
+	buf.WriteString(e.quoteIdent(entity.TableName()))
+
+	entityVal := reflect.ValueOf(entity)
+	var primaryKeys []primaryKeyInfo
+	for index := range entityVal.NumField() {
+		offset := e.schema.allFields[index]
+		info := e.schema.fieldInfos[offset]
+
+		if info.isPrimaryKey {
+			primaryKeys = append(primaryKeys, primaryKeyInfo{
+				info: info,
+				val:  entityVal.Field(index).Interface(),
+			})
+		}
+	}
+
+	buf.WriteString(" WHERE ")
+	var args []any
+	for index, primaryKey := range primaryKeys {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
+		buf.WriteString(" = ?")
+		args = append(args, primaryKey.val)
+	}
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return err
+}
+
 func (e *Executor[T]) quoteIdent(name string) string {
 	return "`" + name + "`"
 }
