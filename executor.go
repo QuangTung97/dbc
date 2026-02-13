@@ -29,6 +29,52 @@ func NewExecutor[T TableNamer](
 	}, nil
 }
 
+func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
+	var buf strings.Builder
+	buf.WriteString("SELECT ")
+
+	entityVal := reflect.ValueOf(id)
+	fieldCount := 0
+	var primaryKeys []primaryKeyInfo
+	for index := range entityVal.NumField() {
+		offset := e.schema.allFields[index]
+		info := e.schema.fieldInfos[offset]
+
+		if info.isPrimaryKey {
+			primaryKeys = append(primaryKeys, primaryKeyInfo{
+				info: info,
+				val:  entityVal.Field(index).Interface(),
+			})
+		}
+
+		if !info.specType.isVisible() {
+			continue
+		}
+
+		fieldCount++
+		if fieldCount > 1 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(info.dbName))
+	}
+
+	buf.WriteString(" FROM ")
+	buf.WriteString(e.quoteIdent(id.TableName()))
+	buf.WriteString(" WHERE ")
+
+	var args []any
+	for index, primaryKey := range primaryKeys {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
+		buf.WriteString(" = ?")
+		args = append(args, primaryKey.val)
+	}
+
+	return NullGet[T](ctx, buf.String(), args...)
+}
+
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 	var buf strings.Builder
 	buf.WriteString("INSERT INTO ")

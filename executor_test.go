@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/QuangTung97/dbc/null"
 )
 
 type executorTest struct {
@@ -18,6 +20,10 @@ type executorTest struct {
 	execArgs    [][]any
 
 	currentIncID int64
+
+	getQueries []string
+	getArgs    [][]any
+	getResult  tableTest03
 }
 
 func newExecTest(_ *testing.T) *executorTest {
@@ -70,6 +76,16 @@ func (e *executorTest) ExecContext(
 	return &fakeResult{
 		insertID: e.currentIncID,
 	}, nil
+}
+
+func (e *executorTest) GetContext(
+	_ context.Context, dest any, query string, args ...any,
+) error {
+	e.getQueries = append(e.getQueries, query)
+	e.getArgs = append(e.getArgs, args)
+	val := dest.(*tableTest03)
+	*val = e.getResult
+	return nil
 }
 
 func TestExecutor_MySQL__Insert(t *testing.T) {
@@ -216,4 +232,40 @@ func TestExecutor_MySQL__Delete(t *testing.T) {
 	assert.Equal(t, []any{
 		entity.ID,
 	}, e.execArgs[0])
+}
+
+func TestExecutor_MySQL__GetByID(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	entity := tableTest03{
+		ID: 11,
+	}
+	e.getResult = tableTest03{
+		ID:       11,
+		Username: "user01",
+	}
+
+	// do insert
+	nullUser, err := exec.GetByID(e.ctx, entity)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, null.New(e.getResult), nullUser) // TODO update
+
+	// check query
+	assert.Equal(t, 1, len(e.getQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `id` = ?",
+		),
+		e.getQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.getArgs))
+	assert.Equal(t, []any{
+		entity.ID,
+	}, e.getArgs[0])
 }
