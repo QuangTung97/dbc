@@ -1,7 +1,6 @@
 package dbc
 
 import (
-	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -10,6 +9,7 @@ type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
 
 	fieldInfos map[fieldOffsetType]fieldInfo
+	allFields  []fieldOffsetType
 
 	primaryKeyOffset []fieldOffsetType
 	primaryKeyType   primaryKeyType
@@ -19,13 +19,16 @@ type Schema[T TableNamer] struct {
 // Private Types
 // ========================================
 
+func (s *Schema[T]) getTableType() string {
+	return s.def.tableType.String()
+}
+
 type schemaDefinition[T any] struct {
 	table          *T
 	tableAddr      unsafe.Pointer
 	tableType      reflect.Type
 	fieldOffsetMap map[fieldOffsetType]reflect.StructField
-
-	validate validateInfo
+	checkedFields  map[fieldOffsetType]struct{}
 }
 
 func newSchemaDefinition[T any]() *schemaDefinition[T] {
@@ -34,6 +37,7 @@ func newSchemaDefinition[T any]() *schemaDefinition[T] {
 		table:          &emptyValue,
 		tableType:      reflect.TypeOf(emptyValue),
 		fieldOffsetMap: map[fieldOffsetType]reflect.StructField{},
+		checkedFields:  map[fieldOffsetType]struct{}{},
 	}
 
 	d.tableAddr = unsafe.Pointer(d.table)
@@ -51,12 +55,9 @@ const (
 type fieldOffsetType uintptr
 
 type fieldInfo struct {
-	dbName  string
-	isConst bool
-	ignored bool
-}
-
-type validateInfo struct {
+	dbName    string
+	isConst   bool
+	isIgnored bool
 }
 
 func RegisterSchema[T TableNamer](
@@ -74,27 +75,32 @@ func RegisterSchema[T TableNamer](
 
 		dbName := field.Tag.Get("db")
 		if len(dbName) == 0 {
-			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.def.tableType.String())
+			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.getTableType())
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
 			dbName: dbName,
 		}
+		s.allFields = append(s.allFields, offset)
 	}
 
 	definitionFn(s, s.def.table)
 
 	// do validate
 	if s.primaryKeyType == 0 {
-		panicFormat("missing 'id' column definition in type '%s'", s.def.tableType.String())
+		panicFormat("missing 'id' column definition in type '%s'", s.getTableType())
+	}
+
+	for _, offset := range s.allFields {
+		fieldType := s.def.fieldOffsetMap[offset]
+		_, ok := s.def.checkedFields[offset]
+		if !ok {
+			panicFormat("missing column spec of field '%s' in type '%s'", fieldType.Name, s.getTableType())
+		}
 	}
 
 	s.def = nil
 	return s
-}
-
-func panicFormat(format string, args ...any) {
-	panic(fmt.Sprintf(format, args...))
 }
 
 // ==========================================
@@ -103,23 +109,58 @@ func panicFormat(format string, args ...any) {
 
 func (s *Schema[T]) getDef() *schemaDefinition[T] {
 	if s.def == nil {
+		// TODO add test
 		panic("function is not allowed to run outside schema definition callback")
 	}
 	return s.def
 }
 
-func SchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) {
+func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 	def := s.getDef()
-	offset := unsafePointerSub(unsafe.Pointer(field), def.tableAddr)
+
+	offset := unsafePointerSub(fieldPtr, def.tableAddr)
 	_, ok := def.fieldOffsetMap[offset]
 	if !ok {
+		// TODO testing
 		panicFormat("TODO invalid")
 	}
+	def.checkedFields[offset] = struct{}{}
+	return offset
+}
 
+func SchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.primaryKeyType = primaryKeyInt64
 	s.primaryKeyOffset = []fieldOffsetType{offset}
 }
 
-func unsafePointerSub(a, b unsafe.Pointer) fieldOffsetType {
-	return fieldOffsetType(a) - fieldOffsetType(b)
+func (s *Schema[T]) updateFieldInfo(offset fieldOffsetType, fn func(info *fieldInfo)) {
+	info := s.fieldInfos[offset]
+	fn(&info)
+	s.fieldInfos[offset] = info
 }
+
+func SchemaConst[T TableNamer, F any](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isConst = true
+	})
+}
+
+func SchemaEditable[T TableNamer, F any](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isConst = false
+	})
+}
+
+func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isIgnored = true
+	})
+}
+
+// ==========================================
+// Private Functions for Query Builder
+// ==========================================
