@@ -24,6 +24,9 @@ type executorTest struct {
 	getQueries []string
 	getArgs    [][]any
 	getResult  tableTest03
+
+	selectQueries []string
+	selectArgs    [][]any
 }
 
 func newExecTest(_ *testing.T) *executorTest {
@@ -85,6 +88,14 @@ func (e *executorTest) GetContext(
 	e.getArgs = append(e.getArgs, args)
 	val := dest.(*tableTest03)
 	*val = e.getResult
+	return nil
+}
+
+func (e *executorTest) SelectContext(
+	_ context.Context, _ any, query string, args ...any,
+) error {
+	e.selectQueries = append(e.selectQueries, query)
+	e.selectArgs = append(e.selectArgs, args)
 	return nil
 }
 
@@ -249,7 +260,7 @@ func TestExecutor_MySQL__GetByID(t *testing.T) {
 	// do insert
 	nullUser, err := exec.GetByID(e.ctx, entity)
 	assert.Equal(t, nil, err)
-	assert.Equal(t, null.New(e.getResult), nullUser) // TODO update
+	assert.Equal(t, null.New(e.getResult), nullUser)
 
 	// check query
 	assert.Equal(t, 1, len(e.getQueries))
@@ -268,4 +279,34 @@ func TestExecutor_MySQL__GetByID(t *testing.T) {
 	assert.Equal(t, []any{
 		entity.ID,
 	}, e.getArgs[0])
+}
+
+func TestExecutor_MySQL__GetMulti(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	entity1 := tableTest03{ID: 11}
+	entity2 := tableTest03{ID: 12}
+	entity3 := tableTest03{ID: 13}
+
+	// do insert
+	userList, err := exec.GetMulti(e.ctx, []tableTest03{entity1, entity2, entity3})
+	assert.Equal(t, nil, err)
+	assert.Equal(t, []tableTest03(nil), userList)
+
+	// check query
+	assert.Equal(t, 1, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `id` IN (?, ?, ?)",
+		),
+		e.selectQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.selectArgs))
+	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.selectArgs[0])
 }

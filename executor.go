@@ -29,22 +29,61 @@ func NewExecutor[T TableNamer](
 	}, nil
 }
 
+func (e *Executor[T]) getValuesOfEntity(
+	offsetList []fieldOffsetType,
+) func(entityVal reflect.Value) []any {
+	var empty T
+	typ := reflect.TypeOf(empty)
+
+	// build map from offset => field index
+	indexMap := map[fieldOffsetType]int{}
+	for index := range typ.NumField() {
+		field := typ.Field(index)
+		offset := fieldOffsetType(field.Offset)
+		indexMap[offset] = index
+	}
+
+	return func(entityVal reflect.Value) []any {
+		result := make([]any, 0, len(offsetList))
+		for _, offset := range offsetList {
+			index := indexMap[offset]
+			val := entityVal.Field(index).Interface()
+			result = append(result, val)
+		}
+		return result
+	}
+}
+
 func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	var buf strings.Builder
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+
+	// build where cond
+	for index, keyCol := range primaryKeys {
+		if index > 0 {
+			// TODO testing
+			buf.WriteString(" AND ")
+		}
+		buf.WriteString(e.quoteIdent(keyCol))
+		buf.WriteString(" = ?")
+	}
+
+	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
+	return NullGet[T](ctx, buf.String(), args...)
+}
+
+func (e *Executor[T]) buildSelectQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
 	buf.WriteString("SELECT ")
 
-	entityVal := reflect.ValueOf(id)
+	var primaryKeys []string
+	var primaryOffsets []fieldOffsetType
 	fieldCount := 0
-	var primaryKeys []primaryKeyInfo
-	for index := range entityVal.NumField() {
-		offset := e.schema.allFields[index]
-		info := e.schema.fieldInfos[offset]
 
+	for _, offset := range e.schema.allFields {
+		info := e.schema.fieldInfos[offset]
 		if info.isPrimaryKey {
-			primaryKeys = append(primaryKeys, primaryKeyInfo{
-				info: info,
-				val:  entityVal.Field(index).Interface(),
-			})
+			primaryKeys = append(primaryKeys, info.dbName)
+			primaryOffsets = append(primaryOffsets, offset)
 		}
 
 		if !info.specType.isVisible() {
@@ -59,20 +98,45 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	}
 
 	buf.WriteString(" FROM ")
-	buf.WriteString(e.quoteIdent(id.TableName()))
+	var emptyValue T
+	buf.WriteString(e.quoteIdent(emptyValue.TableName()))
 	buf.WriteString(" WHERE ")
 
-	var args []any
-	for index, primaryKey := range primaryKeys {
+	return primaryKeys, primaryOffsets
+}
+
+func (e *Executor[T]) buildPlaceholderLen(buf *strings.Builder, size int) {
+	buf.WriteString("(")
+	for index := range size {
 		if index > 0 {
 			buf.WriteString(", ")
 		}
-		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
-		buf.WriteString(" = ?")
-		args = append(args, primaryKey.val)
+		buf.WriteString("?")
+	}
+	buf.WriteString(")")
+}
+
+func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
+	var buf strings.Builder
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+
+	// build where cond
+	buf.WriteString(e.quoteIdent(primaryKeys[0]))
+	buf.WriteString(" IN ")
+	e.buildPlaceholderLen(&buf, len(idList))
+
+	// build args
+	getFunc := e.getValuesOfEntity(primaryOffsets)
+	args := make([]any, 0, len(primaryOffsets)*len(idList))
+	for _, id := range idList {
+		args = append(args, getFunc(reflect.ValueOf(id))...)
 	}
 
-	return NullGet[T](ctx, buf.String(), args...)
+	// execute
+	tx := GetReadonly(ctx)
+	var result []T
+	err := tx.SelectContext(ctx, &result, buf.String(), args...)
+	return result, err
 }
 
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
@@ -85,7 +149,6 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 	entityVal := reflect.ValueOf(entity).Elem()
 	fieldCount := 0
 	var args []any
-	var placeholder strings.Builder
 
 	var autoIncField null.Null[reflect.Value]
 
@@ -103,18 +166,15 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 		fieldCount++
 		if fieldCount > 1 {
 			buf.WriteString(", ")
-			placeholder.WriteString(", ")
 		}
 		buf.WriteString(e.quoteIdent(info.dbName))
-		placeholder.WriteString("?")
 
 		val := entityVal.Field(index).Interface()
 		args = append(args, val)
 	}
 
-	buf.WriteString(") VALUES (")
-	buf.WriteString(placeholder.String())
-	buf.WriteString(")")
+	buf.WriteString(") VALUES ")
+	e.buildPlaceholderLen(&buf, fieldCount)
 
 	tx := GetTx(ctx)
 	result, err := tx.ExecContext(ctx, buf.String(), args...)
