@@ -302,37 +302,33 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	var buf strings.Builder
-	buf.WriteString("DELETE FROM ")
-	buf.WriteString(e.quoteIdent(entity.TableName()))
+	primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
 
-	entityVal := reflect.ValueOf(entity)
-	var primaryKeys []primaryKeyInfo
-	for index := range entityVal.NumField() {
-		offset := e.schema.allFields[index]
-		info := e.schema.fieldInfos[offset]
-
-		if info.isPrimaryKey {
-			primaryKeys = append(primaryKeys, primaryKeyInfo{
-				info: info,
-				val:  entityVal.Field(index).Interface(),
-			})
-		}
-	}
-
-	buf.WriteString(" WHERE ")
-	var args []any
-	for index, primaryKey := range primaryKeys {
-		if index > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
-		buf.WriteString(" = ?")
-		args = append(args, primaryKey.val)
-	}
+	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
+	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(entity))
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
 	return err
+}
+
+func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
+	buf.WriteString("DELETE FROM ")
+	var empty T
+	buf.WriteString(e.quoteIdent(empty.TableName()))
+
+	var primaryKeys []string
+	var primaryOffsets []fieldOffsetType
+	for _, offset := range e.schema.allFields {
+		info := e.schema.fieldInfos[offset]
+		if info.isPrimaryKey {
+			primaryKeys = append(primaryKeys, info.dbName)
+			primaryOffsets = append(primaryOffsets, offset)
+		}
+	}
+
+	buf.WriteString(" WHERE ")
+	return primaryKeys, primaryOffsets
 }
 
 func (e *Executor[T]) quoteIdent(name string) string {
