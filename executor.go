@@ -30,13 +30,10 @@ func NewExecutor[T TableNamer](
 }
 
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
-	tx := GetTx(ctx)
-
 	var buf strings.Builder
 	buf.WriteString("INSERT INTO ")
 
-	var empty T
-	buf.WriteString(e.quoteIdent(empty.TableName()))
+	buf.WriteString(e.quoteIdent((*entity).TableName()))
 	buf.WriteString(" (")
 
 	entityVal := reflect.ValueOf(entity).Elem()
@@ -73,6 +70,7 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 	buf.WriteString(placeholder.String())
 	buf.WriteString(")")
 
+	tx := GetTx(ctx)
 	result, err := tx.ExecContext(ctx, buf.String(), args...)
 	if err != nil {
 		return err
@@ -89,6 +87,64 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 
 	return err
 }
+
+// TODO insert multi
+
+type primaryKeyInfo struct {
+	info fieldInfo
+	val  any
+}
+
+func (e *Executor[T]) Update(ctx context.Context, entity T) error {
+	var buf strings.Builder
+	buf.WriteString("UPDATE ")
+	buf.WriteString(e.quoteIdent(entity.TableName()))
+	buf.WriteString(" SET ")
+
+	entityVal := reflect.ValueOf(entity)
+	fieldCount := 0
+	var args []any
+	var primaryKeys []primaryKeyInfo
+	for index := range entityVal.NumField() {
+		offset := e.schema.allFields[index]
+		info := e.schema.fieldInfos[offset]
+
+		if info.isPrimaryKey {
+			primaryKeys = append(primaryKeys, primaryKeyInfo{
+				info: info,
+				val:  entityVal.Field(index).Interface(),
+			})
+		}
+
+		if info.specType != fieldSpecEditable {
+			continue
+		}
+
+		fieldCount++
+		if fieldCount > 1 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(info.dbName))
+		buf.WriteString(" = ?")
+		args = append(args, entityVal.Field(index).Interface())
+	}
+
+	buf.WriteString(" WHERE ")
+	for index, primaryKey := range primaryKeys {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
+		buf.WriteString(" = ?")
+		args = append(args, primaryKey.val)
+	}
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return err
+}
+
+// TODO update multi
 
 func (e *Executor[T]) quoteIdent(name string) string {
 	return "`" + name + "`"

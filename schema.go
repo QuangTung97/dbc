@@ -73,9 +73,10 @@ func (t fieldSpecType) isVisible() bool {
 }
 
 type fieldInfo struct {
-	dbName    string
-	specType  fieldSpecType
-	isAutoInc bool
+	dbName       string
+	specType     fieldSpecType
+	isAutoInc    bool
+	isPrimaryKey bool
 }
 
 func RegisterSchema[T TableNamer](
@@ -149,19 +150,23 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 	return offset
 }
 
-func SchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) {
+func doSchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) fieldOffsetType {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.primaryKeyType = primaryKeyInt64
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isPrimaryKey = true
 		info.specType = fieldSpecConst
 	})
+	return offset
+}
+
+func SchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) {
+	doSchemaIDInt64(s, field)
 }
 
 func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
-	s.primaryKeyType = primaryKeyInt64
+	offset := doSchemaIDInt64(s, field)
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
-		info.specType = fieldSpecConst
 		info.isAutoInc = true
 	})
 }
