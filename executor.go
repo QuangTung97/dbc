@@ -11,8 +11,8 @@ import (
 type DatabaseDialect int
 
 const (
-	DialectMysql DatabaseDialect = iota + 1
-	DialectPostgres
+	DialectMysql    DatabaseDialect = iota + 1
+	DialectPostgres                 // TODO add test
 )
 
 type Executor[T TableNamer] struct {
@@ -75,6 +75,26 @@ func (e *Executor[T]) GetWithLock(ctx context.Context, id T) (null.Null[T], erro
 	return NullGet[T](ctx, buf.String(), args...)
 }
 
+func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
+	if len(idList) == 0 {
+		return nil, nil
+	}
+
+	var buf strings.Builder
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+	args := e.buildPrimaryEqualMatchMulti(&buf, primaryKeys, primaryOffsets, idList)
+
+	// execute
+	tx := GetReadonly(ctx)
+	var result []T
+	err := tx.SelectContext(ctx, &result, buf.String(), args...)
+	return result, err
+}
+
+// TODO add get with condition
+
+// TODO add select with condition
+
 func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primaryKeys []string) {
 	for index, keyCol := range primaryKeys {
 		if index > 0 {
@@ -83,6 +103,28 @@ func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primary
 		buf.WriteString(e.quoteIdent(keyCol))
 		buf.WriteString(" = ?")
 	}
+}
+
+func (e *Executor[T]) buildPrimaryEqualMatchMulti(
+	buf *strings.Builder, primaryKeys []string, primaryOffsets []fieldOffsetType, idList []T,
+) []any {
+	if len(primaryKeys) > 1 {
+		e.buildWhereInMultiCols(buf, primaryKeys)
+		buf.WriteString(" IN ")
+		e.buildPlaceholderTwoLevels(buf, len(primaryKeys), len(idList))
+	} else {
+		buf.WriteString(e.quoteIdent(primaryKeys[0]))
+		buf.WriteString(" IN ")
+		e.buildPlaceholderLen(buf, len(idList))
+	}
+
+	// build args
+	getFunc := e.getValuesOfEntity(primaryOffsets)
+	args := make([]any, 0, len(primaryOffsets)*len(idList))
+	for _, id := range idList {
+		args = append(args, getFunc(reflect.ValueOf(id))...)
+	}
+	return args
 }
 
 func (e *Executor[T]) buildSelectQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
@@ -160,38 +202,6 @@ func (e *Executor[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string)
 	buf.WriteString(")")
 }
 
-func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
-	if len(idList) == 0 {
-		return nil, nil
-	}
-
-	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
-
-	if len(primaryKeys) > 1 {
-		e.buildWhereInMultiCols(&buf, primaryKeys)
-		buf.WriteString(" IN ")
-		e.buildPlaceholderTwoLevels(&buf, len(primaryKeys), len(idList))
-	} else {
-		buf.WriteString(e.quoteIdent(primaryKeys[0]))
-		buf.WriteString(" IN ")
-		e.buildPlaceholderLen(&buf, len(idList))
-	}
-
-	// build args
-	getFunc := e.getValuesOfEntity(primaryOffsets)
-	args := make([]any, 0, len(primaryOffsets)*len(idList))
-	for _, id := range idList {
-		args = append(args, getFunc(reflect.ValueOf(id))...)
-	}
-
-	// execute
-	tx := GetReadonly(ctx)
-	var result []T
-	err := tx.SelectContext(ctx, &result, buf.String(), args...)
-	return result, err
-}
-
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 	var buf strings.Builder
 	buf.WriteString("INSERT INTO ")
@@ -249,11 +259,6 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 
 // TODO insert multi
 
-type primaryKeyInfo struct {
-	info fieldInfo
-	val  any
-}
-
 func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	var buf strings.Builder
 	buf.WriteString("UPDATE ")
@@ -299,6 +304,7 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 }
 
 // TODO update multi
+// TODO update with condition
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	var buf strings.Builder
@@ -306,6 +312,16 @@ func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
 	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(entity))
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return err
+}
+
+func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
+	var buf strings.Builder
+	primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
+	args := e.buildPrimaryEqualMatchMulti(&buf, primaryKeys, primaryOffsets, idList)
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)

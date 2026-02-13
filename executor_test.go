@@ -269,6 +269,34 @@ func TestExecutor_MySQL__Delete(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__DeleteMulti(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	entity1 := tableTest03{ID: 11}
+	entity2 := tableTest03{ID: 12}
+	entity3 := tableTest03{ID: 13}
+
+	// do delete
+	err := exec.DeleteMulti(e.ctx, []tableTest03{entity1, entity2, entity3})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"DELETE FROM `table_test03`",
+			"WHERE `id` IN (?, ?, ?)",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__GetByID(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()
