@@ -305,6 +305,37 @@ func TestExecutor_MySQL__GetByID(t *testing.T) {
 	}, e.getArgs[0])
 }
 
+func TestExecutor_MySQL__GetWithLock(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	entity := tableTest03{
+		ID: 11,
+	}
+
+	// do get
+	_, err := exec.GetWithLock(e.ctx, entity)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.getQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `id` = ? FOR UPDATE",
+		),
+		e.getQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.getArgs))
+	assert.Equal(t, []any{
+		entity.ID,
+	}, e.getArgs[0])
+}
+
 func TestExecutor_MySQL__GetMulti(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()

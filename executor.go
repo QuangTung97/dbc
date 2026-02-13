@@ -64,7 +64,16 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	return NullGet[T](ctx, buf.String(), args...)
 }
 
-// TODO get with lock
+func (e *Executor[T]) GetWithLock(ctx context.Context, id T) (null.Null[T], error) {
+	var buf strings.Builder
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+
+	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
+	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
+	buf.WriteString(" FOR UPDATE")
+
+	return NullGet[T](ctx, buf.String(), args...)
+}
 
 func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primaryKeys []string) {
 	for index, keyCol := range primaryKeys {

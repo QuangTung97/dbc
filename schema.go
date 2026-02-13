@@ -11,7 +11,7 @@ type Schema[T TableNamer] struct {
 	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
-	primaryKeyType primaryKeyType // TODO delete
+	primaryKeyDefined bool
 }
 
 // ========================================
@@ -43,13 +43,6 @@ func newSchemaDefinition[T any]() *schemaDefinition[T] {
 
 	return d
 }
-
-type primaryKeyType int
-
-const (
-	primaryKeyInt64 primaryKeyType = iota + 1
-	primaryKeyNonInt
-)
 
 type fieldOffsetType uintptr
 
@@ -106,8 +99,8 @@ func RegisterSchema[T TableNamer](
 	definitionFn(s, s.def.table)
 
 	// do validate
-	if s.primaryKeyType == 0 {
-		panicFormat("missing 'id' column definition in type '%s'", s.getTableType())
+	if !s.primaryKeyDefined {
+		panicFormat("missing 'id' column or primary key definition in type '%s'", s.getTableType())
 	}
 
 	for _, offset := range s.allFields {
@@ -128,8 +121,7 @@ func RegisterSchema[T TableNamer](
 
 func (s *Schema[T]) getDef() *schemaDefinition[T] {
 	if s.def == nil {
-		// TODO add test
-		panic("function is not allowed to run outside schema definition callback")
+		panic("function is not allowed to run outside of schema definition callback")
 	}
 	return s.def
 }
@@ -140,8 +132,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 	offset := unsafePointerSub(fieldPtr, def.tableAddr)
 	fieldType, ok := def.fieldOffsetMap[offset]
 	if !ok {
-		// TODO testing
-		panicFormat("TODO invalid")
+		panicFormat("invalid field address value")
 	}
 
 	if _, existed := def.checkedFields[offset]; existed {
@@ -154,7 +145,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 
 func doSchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) fieldOffsetType {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
-	s.primaryKeyType = primaryKeyInt64
+	s.primaryKeyDefined = true
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.isPrimaryKey = true
 		info.specType = fieldSpecConst
@@ -175,7 +166,7 @@ func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
 
 func SchemaCompositePrimaryKey[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
-	s.primaryKeyType = primaryKeyNonInt
+	s.primaryKeyDefined = true
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.isPrimaryKey = true
 		info.specType = fieldSpecConst

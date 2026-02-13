@@ -16,10 +16,14 @@ func newTestSchema(_ *testing.T) *schemaTest {
 
 func TestRegisterSchema_Missing_ID(t *testing.T) {
 	newTestSchema(t)
-	assert.PanicsWithValue(t, "missing 'id' column definition in type 'dbc.tableTest01'", func() {
-		RegisterSchema(func(s *Schema[tableTest01], table *tableTest01) {
-		})
-	})
+	assert.PanicsWithValue(
+		t,
+		"missing 'id' column or primary key definition in type 'dbc.tableTest01'",
+		func() {
+			RegisterSchema(func(s *Schema[tableTest01], table *tableTest01) {
+			})
+		},
+	)
 }
 
 func TestRegisterSchema_Not_Found_Struct_Tag_DB(t *testing.T) {
@@ -87,5 +91,42 @@ func TestRegisterSchema_Duplicated_Definition(t *testing.T) {
 
 			SchemaIgnore(s, &table.CreatedAt)
 		})
+	})
+}
+
+func TestRegisterSchema_Normal__Invalid_Address(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(t, "invalid field address value", func() {
+		RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+			SchemaIDInt64(s, &table.ID)
+			SchemaConst(s, &table.RoleID)
+
+			SchemaEditable(s, &table.Username)
+			SchemaEditable(s, &table.Age)
+
+			// invalid
+			ptr := new(int)
+			SchemaEditable(s, ptr)
+
+			SchemaIgnore(s, &table.CreatedAt)
+			SchemaIgnore(s, &table.UpdatedAt)
+		})
+	})
+}
+
+func TestRegisterSchema_Normal__Use_Definition_Function_Outside(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(t, "function is not allowed to run outside of schema definition callback", func() {
+		s := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+			SchemaIDInt64(s, &table.ID)
+			SchemaConst(s, &table.RoleID)
+
+			SchemaEditable(s, &table.Username)
+			SchemaEditable(s, &table.Age)
+
+			SchemaIgnore(s, &table.CreatedAt)
+			SchemaIgnore(s, &table.UpdatedAt)
+		})
+		SchemaEditable(s, new(int))
 	})
 }
