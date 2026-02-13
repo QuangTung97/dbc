@@ -11,8 +11,7 @@ type Schema[T TableNamer] struct {
 	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
-	primaryKeyOffset []fieldOffsetType
-	primaryKeyType   primaryKeyType
+	primaryKeyType primaryKeyType
 }
 
 // ========================================
@@ -54,10 +53,29 @@ const (
 
 type fieldOffsetType uintptr
 
+type fieldSpecType int
+
+const (
+	fieldSpecEditable fieldSpecType = iota + 1
+	fieldSpecConst
+	fieldSpecIgnored
+)
+
+func (t fieldSpecType) isVisible() bool {
+	switch t {
+	case fieldSpecEditable:
+		return true
+	case fieldSpecConst:
+		return true
+	default:
+		return false
+	}
+}
+
 type fieldInfo struct {
 	dbName    string
-	isConst   bool
-	isIgnored bool
+	specType  fieldSpecType
+	isAutoInc bool
 }
 
 func RegisterSchema[T TableNamer](
@@ -71,6 +89,7 @@ func RegisterSchema[T TableNamer](
 	for index := range s.def.tableType.NumField() {
 		field := s.def.tableType.Field(index)
 		offset := fieldOffsetType(field.Offset)
+		s.allFields = append(s.allFields, offset)
 		s.def.fieldOffsetMap[offset] = field
 
 		dbName := field.Tag.Get("db")
@@ -81,7 +100,6 @@ func RegisterSchema[T TableNamer](
 		s.fieldInfos[offset] = fieldInfo{
 			dbName: dbName,
 		}
-		s.allFields = append(s.allFields, offset)
 	}
 
 	definitionFn(s, s.def.table)
@@ -124,6 +142,9 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 		// TODO testing
 		panicFormat("TODO invalid")
 	}
+
+	// TODO if already get => panic
+
 	def.checkedFields[offset] = struct{}{}
 	return offset
 }
@@ -131,7 +152,18 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 func SchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.primaryKeyType = primaryKeyInt64
-	s.primaryKeyOffset = []fieldOffsetType{offset}
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.specType = fieldSpecConst
+	})
+}
+
+func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	s.primaryKeyType = primaryKeyInt64
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.specType = fieldSpecConst
+		info.isAutoInc = true
+	})
 }
 
 func (s *Schema[T]) updateFieldInfo(offset fieldOffsetType, fn func(info *fieldInfo)) {
@@ -143,24 +175,36 @@ func (s *Schema[T]) updateFieldInfo(offset fieldOffsetType, fn func(info *fieldI
 func SchemaConst[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
-		info.isConst = true
+		info.specType = fieldSpecConst
 	})
 }
 
 func SchemaEditable[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
-		info.isConst = false
+		info.specType = fieldSpecEditable
 	})
 }
 
 func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field))
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
-		info.isIgnored = true
+		info.specType = fieldSpecIgnored
 	})
 }
 
 // ==========================================
 // Private Functions for Query Builder
 // ==========================================
+
+func (s *Schema[T]) getAllColumns() []string {
+	result := make([]string, 0, len(s.allFields))
+	for _, offset := range s.allFields {
+		info := s.fieldInfos[offset]
+		if !info.specType.isVisible() {
+			continue
+		}
+		result = append(result, info.dbName)
+	}
+	return result
+}
