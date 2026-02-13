@@ -58,7 +58,13 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
 
-	// build where cond
+	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
+	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
+
+	return NullGet[T](ctx, buf.String(), args...)
+}
+
+func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primaryKeys []string) {
 	for index, keyCol := range primaryKeys {
 		if index > 0 {
 			// TODO testing
@@ -67,9 +73,6 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 		buf.WriteString(e.quoteIdent(keyCol))
 		buf.WriteString(" = ?")
 	}
-
-	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
-	return NullGet[T](ctx, buf.String(), args...)
 }
 
 func (e *Executor[T]) buildSelectQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
@@ -120,7 +123,7 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
 
-	// build where cond
+	// build where cond, TODO handle primary key multi column
 	buf.WriteString(e.quoteIdent(primaryKeys[0]))
 	buf.WriteString(" IN ")
 	e.buildPlaceholderLen(&buf, len(idList))
@@ -210,16 +213,17 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	entityVal := reflect.ValueOf(entity)
 	fieldCount := 0
 	var args []any
-	var primaryKeys []primaryKeyInfo
+
+	var primaryKeys []string
+	var primaryOffsets []fieldOffsetType
+
 	for index := range entityVal.NumField() {
 		offset := e.schema.allFields[index]
 		info := e.schema.fieldInfos[offset]
 
 		if info.isPrimaryKey {
-			primaryKeys = append(primaryKeys, primaryKeyInfo{
-				info: info,
-				val:  entityVal.Field(index).Interface(),
-			})
+			primaryKeys = append(primaryKeys, info.dbName)
+			primaryOffsets = append(primaryOffsets, offset)
 		}
 
 		if info.specType != fieldSpecEditable {
@@ -236,14 +240,8 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	}
 
 	buf.WriteString(" WHERE ")
-	for index, primaryKey := range primaryKeys {
-		if index > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString(e.quoteIdent(primaryKey.info.dbName))
-		buf.WriteString(" = ?")
-		args = append(args, primaryKey.val)
-	}
+	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
+	args = append(args, e.getValuesOfEntity(primaryOffsets)(entityVal)...)
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
