@@ -1,4 +1,4 @@
-package dblib
+package dbc
 
 import "context"
 

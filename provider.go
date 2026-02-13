@@ -1,4 +1,4 @@
-package dblib
+package dbc
 
 import (
 	"context"
@@ -39,7 +39,7 @@ var _ Transaction = &sqlx.Tx{}
 func GetReadonly(ctx context.Context) Readonly {
 	val, ok := getFromContext(ctx)
 	if !ok {
-		panic("Missing call to method of dblib.Provider")
+		panic("Missing call to method of dbc.Provider")
 	}
 	return val.tx
 }
@@ -47,7 +47,7 @@ func GetReadonly(ctx context.Context) Readonly {
 func GetTx(ctx context.Context) Transaction {
 	val, ok := getFromContext(ctx)
 	if !ok {
-		panic("Missing call to method of dblib.Provider")
+		panic("Missing call to method of dbc.Provider")
 	}
 
 	if val.isReadonly {
@@ -84,6 +84,8 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 	if ok && !val.isReadonly {
 		return fn(ctx)
 	}
+
+	// TODO support before transaction and after transaction hook
 
 	tx, err := p.db.BeginTxx(ctx, nil)
 	if err != nil {

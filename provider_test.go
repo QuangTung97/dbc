@@ -1,4 +1,4 @@
-package dblib
+package dbc
 
 import (
 	"context"
@@ -133,7 +133,7 @@ func TestProvider__Autocommit(t *testing.T) {
 }
 
 func TestProvider__EmptyContext(t *testing.T) {
-	assert.PanicsWithValue(t, "Missing call to method of dblib.Provider", func() {
+	assert.PanicsWithValue(t, "Missing call to method of dbc.Provider", func() {
 		getAuthUser(context.Background(), 1)
 	})
 }
