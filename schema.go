@@ -86,7 +86,7 @@ func RegisterSchema[T TableNamer](
 		s.allFields = append(s.allFields, offset)
 		s.def.fieldOffsetMap[offset] = field
 
-		dbName := field.Tag.Get("db")
+		dbName := field.Tag.Get(DBTag)
 		if len(dbName) == 0 {
 			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.getTableType())
 		}

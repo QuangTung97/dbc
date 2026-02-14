@@ -91,7 +91,10 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 	return result, err
 }
 
-// TODO add get with condition
+func (e *Executor[T]) GetCond(ctx context.Context, cond CondBuilderFunc[T]) (null.Null[T], error) {
+	// TODO impl
+	return null.Null[T]{}, nil
+}
 
 // TODO add select with condition
 
