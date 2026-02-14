@@ -3,6 +3,7 @@ package dbc
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -295,6 +296,44 @@ func TestExecutor_MySQL__DeleteMulti(t *testing.T) {
 	// check args
 	assert.Equal(t, 1, len(e.execArgs))
 	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.execArgs[0])
+}
+
+func TestExecutor_MySQL__DeleteCond(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do delete
+	err := exec.DeleteCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {
+		CondEqual(b, &table.RoleID, testRoleID(32))
+	})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"DELETE FROM `table_test03`",
+			"WHERE `role_id` = ?",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{testRoleID(32)}, e.execArgs[0])
+}
+
+func TestExecutor_MySQL__DeleteCond__No_Cond(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do delete
+	err := exec.DeleteCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {})
+	assert.Equal(t, errors.New("delete where condition must not be empty"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
 }
 
 func TestExecutor_MySQL__GetByID(t *testing.T) {

@@ -2,6 +2,7 @@ package dbc
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -91,29 +92,30 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 	return result, err
 }
 
-func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) []any {
+func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) ([]any, bool) {
 	builder, table := NewCondBuilder[T](e.dialect)
 	cond(builder, table)
+	if builder.IsEmpty() {
+		return nil, true
+	}
 
 	whereCond, args := builder.GetWhereCond()
-	if len(whereCond) > 0 {
-		buf.WriteString(" WHERE ")
-		buf.WriteString(whereCond)
-	}
-	return args
+	buf.WriteString(" WHERE ")
+	buf.WriteString(whereCond)
+	return args, false
 }
 
 func (e *Executor[T]) GetCond(ctx context.Context, cond CondBuilderFunc[T]) (null.Null[T], error) {
 	var buf strings.Builder
 	e.buildSelectQuery(&buf, false)
-	args := e.buildWhereCondFromCond(&buf, cond)
+	args, _ := e.buildWhereCondFromCond(&buf, cond)
 	return NullGet[T](ctx, buf.String(), args...)
 }
 
 func (e *Executor[T]) SelectCond(ctx context.Context, cond CondBuilderFunc[T]) ([]T, error) {
 	var buf strings.Builder
 	e.buildSelectQuery(&buf, false)
-	args := e.buildWhereCondFromCond(&buf, cond)
+	args, _ := e.buildWhereCondFromCond(&buf, cond)
 
 	var result []T
 	err := GetReadonly(ctx).SelectContext(ctx, &result, buf.String(), args...)
@@ -357,7 +359,21 @@ func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
 	return err
 }
 
-// TODO delete by cond
+func (e *Executor[T]) DeleteCond(ctx context.Context, cond CondBuilderFunc[T]) error {
+	var buf strings.Builder
+	buf.WriteString("DELETE FROM ")
+	var empty T
+	buf.WriteString(e.quoteIdent(empty.TableName()))
+
+	args, isEmpty := e.buildWhereCondFromCond(&buf, cond)
+	if isEmpty {
+		return fmt.Errorf("delete where condition must not be empty")
+	}
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return err
+}
 
 func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
 	buf.WriteString("DELETE FROM ")

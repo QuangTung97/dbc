@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"unsafe"
+
+	"github.com/QuangTung97/dbc/null"
 )
 
 type CondBuilder[T any] struct {
@@ -56,6 +58,22 @@ func CondColumnExpr[T any, F any](
 	dbName := c.quoteIdent(c.offsetDBName[offset])
 	c.condList = append(c.condList, fn(dbName))
 	c.args = append(c.args, args...)
+}
+
+func CondIsNull[T any, F any](c *CondBuilder[T], field *null.Null[F]) {
+	offset := unsafePointerSub(unsafe.Pointer(field), c.basePtr)
+	dbName := c.quoteIdent(c.offsetDBName[offset])
+	c.condList = append(c.condList, dbName+" IS NULL")
+}
+
+func CondIsNotNull[T any, F any](c *CondBuilder[T], field *null.Null[F]) {
+	offset := unsafePointerSub(unsafe.Pointer(field), c.basePtr)
+	dbName := c.quoteIdent(c.offsetDBName[offset])
+	c.condList = append(c.condList, dbName+" IS NOT NULL")
+}
+
+func (c *CondBuilder[T]) IsEmpty() bool {
+	return len(c.condList) == 0
 }
 
 func (c *CondBuilder[T]) quoteIdent(name string) string {

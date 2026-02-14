@@ -1,6 +1,10 @@
 package dbc
 
-import "time"
+import (
+	"time"
+
+	"github.com/QuangTung97/dbc/null"
+)
 
 // ------------------------------
 
@@ -51,4 +55,18 @@ type tableTest04 struct {
 
 func (tableTest04) TableName() string {
 	return "table_test04"
+}
+
+// ------------------------------
+
+type tableTest05 struct {
+	ID        int64                 `db:"id"`
+	RoleID    null.Null[testRoleID] `db:"role_id"`
+	Username  string                `db:"username"`
+	Age       int                   `db:"age"`
+	CreatedAt time.Time             `db:"created_at"`
+}
+
+func (tableTest05) TableName() string {
+	return "table_test05"
 }
