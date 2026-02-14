@@ -77,6 +77,5 @@ func (c *CondBuilder[T]) IsEmpty() bool {
 }
 
 func (c *CondBuilder[T]) quoteIdent(name string) string {
-	// TODO refactor
-	return "`" + name + "`"
+	return quoteIdentWithDialect(c.dialect, name)
 }

@@ -396,5 +396,5 @@ func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldO
 }
 
 func (e *Executor[T]) quoteIdent(name string) string {
-	return "`" + name + "`"
+	return quoteIdentWithDialect(e.dialect, name)
 }

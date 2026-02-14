@@ -18,7 +18,7 @@ type Schema[T TableNamer] struct {
 // Private Types
 // ========================================
 
-func (s *Schema[T]) getTableType() string {
+func (s *Schema[T]) getTableTypeName() string {
 	return s.def.tableType.String()
 }
 
@@ -88,7 +88,7 @@ func RegisterSchema[T TableNamer](
 
 		dbName := field.Tag.Get(DBTag)
 		if len(dbName) == 0 {
-			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.getTableType())
+			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.getTableTypeName())
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
@@ -100,14 +100,14 @@ func RegisterSchema[T TableNamer](
 
 	// do validate
 	if !s.primaryKeyDefined {
-		panicFormat("missing 'id' column or primary key definition in type '%s'", s.getTableType())
+		panicFormat("missing 'id' column or primary key definition in type '%s'", s.getTableTypeName())
 	}
 
 	for _, offset := range s.allFields {
 		fieldType := s.def.fieldOffsetMap[offset]
 		_, ok := s.def.checkedFields[offset]
 		if !ok {
-			panicFormat("missing column spec of field '%s' in type '%s'", fieldType.Name, s.getTableType())
+			panicFormat("missing column spec of field '%s' in type '%s'", fieldType.Name, s.getTableTypeName())
 		}
 	}
 
@@ -136,7 +136,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 	}
 
 	if _, existed := def.checkedFields[offset]; existed {
-		panicFormat("field '%s' in type '%s' has already been specified", fieldType.Name, s.getTableType())
+		panicFormat("field '%s' in type '%s' has already been specified", fieldType.Name, s.getTableTypeName())
 	}
 
 	def.checkedFields[offset] = struct{}{}
@@ -198,6 +198,19 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.specType = fieldSpecIgnored
 	})
+}
+
+// ==========================================
+// Schema Validation Functions
+// ==========================================
+
+// TODO add validator
+// TODO update logic for Insert & Update
+
+func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
+}
+
+func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) error) {
 }
 
 // ==========================================
