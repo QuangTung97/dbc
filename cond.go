@@ -10,11 +10,13 @@ type CondBuilder[T any] struct {
 	basePtr      unsafe.Pointer
 	offsetDBName map[fieldOffsetType]string
 
+	dialect DatabaseDialect
+
 	condList []string
 	args     []any
 }
 
-func NewCondBuilder[T any]() (*CondBuilder[T], *T) {
+func NewCondBuilder[T any](dialect DatabaseDialect) (*CondBuilder[T], *T) {
 	var emptyVal T
 	tablePtr := &emptyVal
 
@@ -29,6 +31,8 @@ func NewCondBuilder[T any]() (*CondBuilder[T], *T) {
 	return &CondBuilder[T]{
 		basePtr:      unsafe.Pointer(tablePtr),
 		offsetDBName: offsetDBName,
+
+		dialect: dialect,
 	}, tablePtr
 }
 
@@ -40,9 +44,18 @@ func (c *CondBuilder[T]) GetWhereCond() (string, []any) {
 
 func CondEqual[T any, F any](c *CondBuilder[T], field *F, value F) {
 	offset := unsafePointerSub(unsafe.Pointer(field), c.basePtr)
-	dbName := c.offsetDBName[offset]
-	c.condList = append(c.condList, c.quoteIdent(dbName)+" = ?")
+	dbName := c.quoteIdent(c.offsetDBName[offset])
+	c.condList = append(c.condList, dbName+" = ?")
 	c.args = append(c.args, value)
+}
+
+func CondColumnExpr[T any, F any](
+	c *CondBuilder[T], field *F, fn func(col string) string, args ...any,
+) {
+	offset := unsafePointerSub(unsafe.Pointer(field), c.basePtr)
+	dbName := c.quoteIdent(c.offsetDBName[offset])
+	c.condList = append(c.condList, fn(dbName))
+	c.args = append(c.args, args...)
 }
 
 func (c *CondBuilder[T]) quoteIdent(name string) string {

@@ -472,3 +472,57 @@ func TestExecutor_MySQL__GetMulti__Composite_Key(t *testing.T) {
 		entity3.RoleID, entity3.Username,
 	}, e.selectArgs[0])
 }
+
+func TestExecutor_MySQL__GetCond(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do get by condition
+	_, err := exec.GetCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {
+		CondEqual(b, &table.RoleID, testRoleID(31))
+	})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.getQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `role_id` = ?",
+		),
+		e.getQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.getArgs))
+	assert.Equal(t, []any{testRoleID(31)}, e.getArgs[0])
+}
+
+func TestExecutor_MySQL__SelectCond(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do select by cond
+	_, err := exec.SelectCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {
+		CondEqual(b, &table.Username, "user02")
+	})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `username` = ?",
+		),
+		e.selectQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.selectArgs))
+	assert.Equal(t, []any{"user02"}, e.selectArgs[0])
+}

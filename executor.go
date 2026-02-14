@@ -56,7 +56,7 @@ func (e *Executor[T]) getValuesOfEntity(
 
 func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
 	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
@@ -66,7 +66,7 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 
 func (e *Executor[T]) GetWithLock(ctx context.Context, id T) (null.Null[T], error) {
 	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
 	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
@@ -81,7 +81,7 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 	}
 
 	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf)
+	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
 	args := e.buildPrimaryEqualMatchMulti(&buf, primaryKeys, primaryOffsets, idList)
 
 	// execute
@@ -91,12 +91,34 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 	return result, err
 }
 
-func (e *Executor[T]) GetCond(ctx context.Context, cond CondBuilderFunc[T]) (null.Null[T], error) {
-	// TODO impl
-	return null.Null[T]{}, nil
+func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) []any {
+	builder, table := NewCondBuilder[T](e.dialect)
+	cond(builder, table)
+
+	whereCond, args := builder.GetWhereCond()
+	if len(whereCond) > 0 {
+		buf.WriteString(" WHERE ")
+		buf.WriteString(whereCond)
+	}
+	return args
 }
 
-// TODO add select with condition
+func (e *Executor[T]) GetCond(ctx context.Context, cond CondBuilderFunc[T]) (null.Null[T], error) {
+	var buf strings.Builder
+	e.buildSelectQuery(&buf, false)
+	args := e.buildWhereCondFromCond(&buf, cond)
+	return NullGet[T](ctx, buf.String(), args...)
+}
+
+func (e *Executor[T]) SelectCond(ctx context.Context, cond CondBuilderFunc[T]) ([]T, error) {
+	var buf strings.Builder
+	e.buildSelectQuery(&buf, false)
+	args := e.buildWhereCondFromCond(&buf, cond)
+
+	var result []T
+	err := GetReadonly(ctx).SelectContext(ctx, &result, buf.String(), args...)
+	return result, err
+}
 
 func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primaryKeys []string) {
 	for index, keyCol := range primaryKeys {
@@ -130,7 +152,9 @@ func (e *Executor[T]) buildPrimaryEqualMatchMulti(
 	return args
 }
 
-func (e *Executor[T]) buildSelectQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
+func (e *Executor[T]) buildSelectQuery(
+	buf *strings.Builder, withWhere bool,
+) ([]string, []fieldOffsetType) {
 	buf.WriteString("SELECT ")
 
 	var primaryKeys []string
@@ -158,7 +182,9 @@ func (e *Executor[T]) buildSelectQuery(buf *strings.Builder) ([]string, []fieldO
 	buf.WriteString(" FROM ")
 	var emptyValue T
 	buf.WriteString(e.quoteIdent(emptyValue.TableName()))
-	buf.WriteString(" WHERE ")
+	if withWhere {
+		buf.WriteString(" WHERE ")
+	}
 
 	return primaryKeys, primaryOffsets
 }
@@ -330,6 +356,8 @@ func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
 	return err
 }
+
+// TODO delete by cond
 
 func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
 	buf.WriteString("DELETE FROM ")
