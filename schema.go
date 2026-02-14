@@ -199,3 +199,32 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 		info.specType = fieldSpecIgnored
 	})
 }
+
+// ==========================================
+// Getter Functions
+// ==========================================
+
+type ColumnGetter[T TableNamer] struct {
+	schema   *Schema[T]
+	baseAddr unsafe.Pointer
+	columns  []string
+}
+
+func (s *Schema[T]) GetColumnNames(fn func(g *ColumnGetter[T], table *T)) []string {
+	var empty T
+	obj := &empty
+
+	getter := &ColumnGetter[T]{
+		schema:   s,
+		baseAddr: unsafe.Pointer(obj),
+	}
+	fn(getter, obj)
+
+	return getter.columns
+}
+
+func ReturnColumn[T TableNamer, F any](g *ColumnGetter[T], field *F) {
+	offset := unsafePointerSub(unsafe.Pointer(field), g.baseAddr)
+	colName := g.schema.fieldInfos[offset].dbName
+	g.columns = append(g.columns, colName)
+}

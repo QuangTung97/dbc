@@ -37,7 +37,7 @@ func TestRegisterSchema_Not_Found_Struct_Tag_DB(t *testing.T) {
 
 func TestRegisterSchema_Normal(t *testing.T) {
 	newTestSchema(t)
-	RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+	s := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
 		SchemaIDInt64(s, &table.ID)
 		SchemaConst(s, &table.RoleID)
 
@@ -47,6 +47,13 @@ func TestRegisterSchema_Normal(t *testing.T) {
 		SchemaIgnore(s, &table.CreatedAt)
 		SchemaIgnore(s, &table.UpdatedAt)
 	})
+
+	// get columns
+	cols := s.GetColumnNames(func(g *ColumnGetter[tableTest03], table *tableTest03) {
+		ReturnColumn(g, &table.Age)
+		ReturnColumn(g, &table.Username)
+	})
+	assert.Equal(t, []string{"age", "username"}, cols)
 }
 
 func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {

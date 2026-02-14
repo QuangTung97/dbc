@@ -336,6 +336,7 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 
 // TODO update multi
 // TODO update with condition
+// TODO add insert or update multi
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	var buf strings.Builder
