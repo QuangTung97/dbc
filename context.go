@@ -9,7 +9,7 @@ type contextValueType struct {
 	tx         Transaction
 }
 
-func newContextValue(tx Transaction, isReadonly bool) *contextValueType {
+func newContextValue(tx transactionWithRebind, isReadonly bool) *contextValueType {
 	return &contextValueType{
 		isReadonly: isReadonly,
 		tx: &autoRebindTransaction{

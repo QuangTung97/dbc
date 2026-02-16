@@ -7,8 +7,13 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type transactionWithRebind interface {
+	Transaction
+	Rebind(query string) string
+}
+
 type autoRebindTransaction struct {
-	base Transaction
+	base transactionWithRebind
 }
 
 var _ Transaction = &autoRebindTransaction{}
@@ -32,10 +37,6 @@ func (tx *autoRebindTransaction) QueryxContext(
 ) (*sqlx.Rows, error) {
 	query = tx.base.Rebind(query)
 	return tx.base.QueryxContext(ctx, query, args...)
-}
-
-func (tx *autoRebindTransaction) Rebind(query string) string {
-	return query
 }
 
 func (tx *autoRebindTransaction) ExecContext(
