@@ -9,6 +9,15 @@ type contextValueType struct {
 	tx         Transaction
 }
 
+func newContextValue(tx Transaction, isReadonly bool) *contextValueType {
+	return &contextValueType{
+		isReadonly: isReadonly,
+		tx: &autoRebindTransaction{
+			base: tx,
+		},
+	}
+}
+
 func getFromContext(ctx context.Context) (*contextValueType, bool) {
 	val, ok := ctx.Value(ctxKey).(*contextValueType)
 	return val, ok

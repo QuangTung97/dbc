@@ -103,10 +103,7 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 		}
 	}()
 
-	val = &contextValueType{
-		isReadonly: false,
-		tx:         tx,
-	}
+	val = newContextValue(tx, false)
 	ctx = setToContext(ctx, val)
 
 	err = fn(ctx)
@@ -114,15 +111,9 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 }
 
 func (p *providerImpl) Readonly(ctx context.Context) context.Context {
-	return setToContext(ctx, &contextValueType{
-		isReadonly: true,
-		tx:         p.db,
-	})
+	return setToContext(ctx, newContextValue(p.db, true))
 }
 
 func (p *providerImpl) Autocommit(ctx context.Context) context.Context {
-	return setToContext(ctx, &contextValueType{
-		isReadonly: false,
-		tx:         p.db,
-	})
+	return setToContext(ctx, newContextValue(p.db, false))
 }
