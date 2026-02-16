@@ -298,10 +298,31 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 		allArgs = append(allArgs, args...)
 	}
 
-	// TODO support postgres
-
 	// execute insert
 	tx := GetTx(ctx)
+	if e.dialect == DialectPostgres && autoIncField.Valid {
+		idOffset := autoIncField.Data
+		buf.WriteString(" RETURNING ")
+		buf.WriteString(e.schema.fieldInfos[idOffset].dbName)
+		var result []int64
+		// TODO add rebind
+		if err := tx.SelectContext(ctx, &result, buf.String(), allArgs...); err != nil {
+			return err
+		}
+
+		idIndices := e.schema.fieldInfos[idOffset].indices
+		for index, idVal := range result {
+			if index >= len(entities) {
+				return fmt.Errorf("id list is bigger than input entities")
+			}
+			entity := entities[index]
+			entityVal := reflect.ValueOf(entity).Elem()
+			getStructFieldAt(entityVal, idIndices).SetInt(idVal)
+		}
+
+		return nil
+	}
+
 	result, err := tx.ExecContext(ctx, buf.String(), allArgs...)
 	if err != nil {
 		return err

@@ -30,7 +30,6 @@ type Transaction interface {
 
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error)
-	NamedQuery(query string, arg any) (*sqlx.Rows, error)
 }
 
 var _ Transaction = &sqlx.DB{}

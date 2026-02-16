@@ -29,11 +29,14 @@ type executorTest struct {
 
 	selectQueries []string
 	selectArgs    [][]any
+	selectHandler func(dest any)
 }
 
 func newExecTest(_ *testing.T) *executorTest {
 	e := &executorTest{}
 	e.currentIncID = 60
+	e.selectHandler = func(dest any) {
+	}
 
 	e.ctx = context.Background()
 	e.ctx = setToContext(e.ctx, &contextValueType{
@@ -67,6 +70,14 @@ func newExecTest(_ *testing.T) *executorTest {
 
 func (e *executorTest) newExec() *Executor[tableTest03] {
 	exec, err := NewExecutor(DialectMysql, e.schema)
+	if err != nil {
+		panic(err)
+	}
+	return exec
+}
+
+func (e *executorTest) newExecPostgres() *Executor[tableTest03] {
+	exec, err := NewExecutor(DialectPostgres, e.schema)
 	if err != nil {
 		panic(err)
 	}
@@ -117,10 +128,11 @@ func (e *executorTest) GetContext(
 }
 
 func (e *executorTest) SelectContext(
-	_ context.Context, _ any, query string, args ...any,
+	_ context.Context, dest any, query string, args ...any,
 ) error {
 	e.selectQueries = append(e.selectQueries, query)
 	e.selectArgs = append(e.selectArgs, args)
+	e.selectHandler(dest)
 	return nil
 }
 
@@ -245,6 +257,54 @@ func TestExecutor_MySQL__Insert_Multi(t *testing.T) {
 	// check insert id
 	assert.Equal(t, int64(61), entity1.ID)
 	assert.Equal(t, int64(62), entity2.ID)
+}
+
+func TestExecutor_PostgresL__Insert_Multi(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecPostgres()
+
+	entity1 := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	e.selectHandler = func(dest any) {
+		idList := dest.(*[]int64)
+		*idList = []int64{65, 66}
+	}
+
+	// do insert
+	err := exec.InsertMulti(e.ctx, []*tableTest03{&entity1, &entity2})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			`INSERT INTO "table_test03" ("role_id", "username", "age")`,
+			`VALUES (?, ?, ?), (?, ?, ?)`,
+			`RETURNING id`,
+		),
+		e.selectQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.selectArgs))
+	assert.Equal(t, []any{
+		entity1.RoleID, entity1.Username, entity1.Age,
+		entity2.RoleID, entity2.Username, entity2.Age,
+	}, e.selectArgs[0])
+
+	// check insert id
+	assert.Equal(t, int64(65), entity1.ID)
+	assert.Equal(t, int64(66), entity2.ID)
 }
 
 func TestExecutor_MySQL__Update(t *testing.T) {
