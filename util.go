@@ -2,6 +2,7 @@ package dbc
 
 import (
 	"fmt"
+	"reflect"
 	"unsafe"
 )
 
@@ -22,4 +23,9 @@ func quoteIdentWithDialect(dialect DatabaseDialect, name string) string {
 	default:
 		return name
 	}
+}
+
+func getStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Value {
+	// TODO allow nested
+	return val.Field(indices[0])
 }

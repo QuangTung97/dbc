@@ -14,6 +14,8 @@ type Schema[T TableNamer] struct {
 	primaryKeyDefined bool
 }
 
+// TODO support struct embedding
+
 // ========================================
 // Private Types
 // ========================================
@@ -65,7 +67,10 @@ func (t fieldSpecType) isVisible() bool {
 	}
 }
 
+type structFieldIndices []int
+
 type fieldInfo struct {
+	indices      structFieldIndices
 	dbName       string
 	specType     fieldSpecType
 	isAutoInc    bool
@@ -92,7 +97,8 @@ func RegisterSchema[T TableNamer](
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
-			dbName: dbName,
+			indices: structFieldIndices{index}, // TODO handle nested
+			dbName:  dbName,
 		}
 	}
 

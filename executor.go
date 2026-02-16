@@ -31,28 +31,15 @@ func NewExecutor[T TableNamer](
 }
 
 func (e *Executor[T]) getValuesOfEntity(
-	offsetList []fieldOffsetType,
-) func(entityVal reflect.Value) []any {
-	var empty T
-	typ := reflect.TypeOf(empty)
-
-	// build map from offset => field index
-	indexMap := map[fieldOffsetType]int{}
-	for index := range typ.NumField() {
-		field := typ.Field(index)
-		offset := fieldOffsetType(field.Offset)
-		indexMap[offset] = index
+	offsetList []fieldOffsetType, entityVal reflect.Value,
+) []any {
+	result := make([]any, 0, len(offsetList))
+	for _, offset := range offsetList {
+		indices := e.schema.fieldInfos[offset].indices
+		val := getStructFieldAt(entityVal, indices).Interface()
+		result = append(result, val)
 	}
-
-	return func(entityVal reflect.Value) []any {
-		result := make([]any, 0, len(offsetList))
-		for _, offset := range offsetList {
-			index := indexMap[offset]
-			val := entityVal.Field(index).Interface()
-			result = append(result, val)
-		}
-		return result
-	}
+	return result
 }
 
 func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
@@ -60,7 +47,7 @@ func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
-	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
+	args := e.getValuesOfEntity(primaryOffsets, reflect.ValueOf(id))
 
 	return NullGet[T](ctx, buf.String(), args...)
 }
@@ -70,7 +57,7 @@ func (e *Executor[T]) GetWithLock(ctx context.Context, id T) (null.Null[T], erro
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
-	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(id))
+	args := e.getValuesOfEntity(primaryOffsets, reflect.ValueOf(id))
 	buf.WriteString(" FOR UPDATE")
 
 	return NullGet[T](ctx, buf.String(), args...)
@@ -146,10 +133,10 @@ func (e *Executor[T]) buildPrimaryEqualMatchMulti(
 	}
 
 	// build args
-	getFunc := e.getValuesOfEntity(primaryOffsets)
 	args := make([]any, 0, len(primaryOffsets)*len(idList))
 	for _, id := range idList {
-		args = append(args, getFunc(reflect.ValueOf(id))...)
+		idArgs := e.getValuesOfEntity(primaryOffsets, reflect.ValueOf(id))
+		args = append(args, idArgs...)
 	}
 	return args
 }
@@ -233,27 +220,25 @@ func (e *Executor[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string)
 	buf.WriteString(")")
 }
 
-func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
-	var buf strings.Builder
+func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType, null.Null[fieldOffsetType]) {
 	buf.WriteString("INSERT INTO ")
 
-	buf.WriteString(e.quoteIdent((*entity).TableName()))
+	var emptyValue T
+
+	buf.WriteString(e.quoteIdent(emptyValue.TableName()))
 	buf.WriteString(" (")
 
-	entityVal := reflect.ValueOf(entity).Elem()
-	fieldCount := 0
-	var args []any
+	var autoIncField null.Null[fieldOffsetType]
+	var normalFields []fieldOffsetType
+	var fieldCount int
 
-	var autoIncField null.Null[reflect.Value]
-
-	for index := range entityVal.NumField() {
-		offset := e.schema.allFields[index]
+	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
 		if !info.specType.isVisible() {
 			continue
 		}
 		if info.isAutoInc {
-			autoIncField = null.New(entityVal.Field(index))
+			autoIncField = null.New(offset)
 			continue
 		}
 
@@ -263,13 +248,22 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 		}
 		buf.WriteString(e.quoteIdent(info.dbName))
 
-		val := entityVal.Field(index).Interface()
-		args = append(args, val)
+		normalFields = append(normalFields, offset)
 	}
 
 	buf.WriteString(") VALUES ")
-	e.buildPlaceholderLen(&buf, fieldCount)
+	return normalFields, autoIncField
+}
 
+func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
+	var buf strings.Builder
+	normalFields, autoIncField := e.buildInsertQuery(&buf)
+	e.buildPlaceholderLen(&buf, len(normalFields))
+
+	entityVal := reflect.ValueOf(entity).Elem()
+	args := e.getValuesOfEntity(normalFields, entityVal)
+
+	// execute insert
 	tx := GetTx(ctx)
 	result, err := tx.ExecContext(ctx, buf.String(), args...)
 	if err != nil {
@@ -277,18 +271,58 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 	}
 
 	if autoIncField.Valid {
-		val := autoIncField.Data
+		autoIncOffset := autoIncField.Data
 		insertID, err := result.LastInsertId()
 		if err != nil {
 			return err
 		}
-		val.SetInt(insertID)
+
+		indices := e.schema.fieldInfos[autoIncOffset].indices
+		getStructFieldAt(entityVal, indices).SetInt(insertID)
 	}
 
 	return err
 }
 
-// TODO insert multi
+func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
+	var buf strings.Builder
+	normalFields, autoIncField := e.buildInsertQuery(&buf)
+
+	var allArgs []any
+	for i, entity := range entities {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		e.buildPlaceholderLen(&buf, len(normalFields))
+		args := e.getValuesOfEntity(normalFields, reflect.ValueOf(entity).Elem())
+		allArgs = append(allArgs, args...)
+	}
+
+	// TODO support postgres
+
+	// execute insert
+	tx := GetTx(ctx)
+	result, err := tx.ExecContext(ctx, buf.String(), allArgs...)
+	if err != nil {
+		return err
+	}
+
+	if autoIncField.Valid {
+		lastID, err := result.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		offset := autoIncField.Data
+		idIndices := e.schema.fieldInfos[offset].indices
+		for i, entity := range entities {
+			entityVal := reflect.ValueOf(entity).Elem()
+			getStructFieldAt(entityVal, idIndices).SetInt(lastID + int64(i))
+		}
+	}
+
+	return nil
+}
 
 func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	var buf strings.Builder
@@ -327,7 +361,7 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 
 	buf.WriteString(" WHERE ")
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
-	args = append(args, e.getValuesOfEntity(primaryOffsets)(entityVal)...)
+	args = append(args, e.getValuesOfEntity(primaryOffsets, entityVal)...)
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
@@ -343,7 +377,7 @@ func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
 
 	e.buildPrimaryEqualMatchSingle(&buf, primaryKeys)
-	args := e.getValuesOfEntity(primaryOffsets)(reflect.ValueOf(entity))
+	args := e.getValuesOfEntity(primaryOffsets, reflect.ValueOf(entity))
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
