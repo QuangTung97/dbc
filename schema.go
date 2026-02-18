@@ -8,7 +8,7 @@ import (
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
 
-	fieldInfos map[fieldOffsetType]fieldInfo // TODO replace all usage
+	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
 	primaryKeyDefined bool
@@ -254,6 +254,6 @@ func (s *Schema[T]) GetColumnNames(fn func(g *ColumnGetter[T], table *T)) []stri
 
 func ReturnColumn[T TableNamer, F any](g *ColumnGetter[T], field *F) {
 	offset := unsafePointerSub(unsafe.Pointer(field), g.baseAddr)
-	colName := g.schema.fieldInfos[offset].dbName
+	colName := g.schema.getFieldInfo(offset).dbName
 	g.columns = append(g.columns, colName)
 }

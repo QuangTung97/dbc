@@ -10,7 +10,6 @@ func panicFormat(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
 
-// unsafePointerSub TODO validate all usage
 func unsafePointerSub(a, b unsafe.Pointer) fieldOffsetType {
 	return fieldOffsetType(a) - fieldOffsetType(b)
 }
