@@ -8,7 +8,7 @@ import (
 )
 
 func TestCondBuilder_Equal(t *testing.T) {
-	c, table := NewCondBuilder[tableTest03](DialectMysql)
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMysql)
 	CondEqual(c, &table.RoleID, testRoleID(21))
 
 	whereCond, args := c.GetWhereCond()
@@ -17,7 +17,7 @@ func TestCondBuilder_Equal(t *testing.T) {
 }
 
 func TestCondBuilder_ColumnExpr(t *testing.T) {
-	c, table := NewCondBuilder[tableTest03](DialectMysql)
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMysql)
 	CondColumnExpr(c, &table.RoleID, func(col string) string {
 		return fmt.Sprintf("LOWER(%s) = ?", col)
 	}, "hello")
@@ -28,7 +28,7 @@ func TestCondBuilder_ColumnExpr(t *testing.T) {
 }
 
 func TestCondBuilder_IsNull(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
 	CondIsNull(c, &table.RoleID)
 
 	whereCond, args := c.GetWhereCond()
@@ -37,7 +37,7 @@ func TestCondBuilder_IsNull(t *testing.T) {
 }
 
 func TestCondBuilder_IsNotNull(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
 	CondIsNotNull(c, &table.RoleID)
 
 	whereCond, args := c.GetWhereCond()

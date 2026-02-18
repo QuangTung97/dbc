@@ -8,10 +8,18 @@ import (
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
 
-	fieldInfos map[fieldOffsetType]fieldInfo
+	fieldInfos map[fieldOffsetType]fieldInfo // TODO replace all usage
 	allFields  []fieldOffsetType
 
 	primaryKeyDefined bool
+}
+
+func (s *Schema[T]) getFieldInfo(offset fieldOffsetType) fieldInfo {
+	info, ok := s.fieldInfos[offset]
+	if !ok {
+		panicFormat("not found field at offset: %d", offset)
+	}
+	return info
 }
 
 // TODO support struct embedding
@@ -212,6 +220,8 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 
 // TODO add validator
 // TODO update logic for Insert & Update
+
+// TODO when inserting, validate id not exist
 
 func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
 }

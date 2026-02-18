@@ -12,8 +12,8 @@ import (
 type DatabaseDialect int
 
 const (
-	DialectMysql    DatabaseDialect = iota + 1
-	DialectPostgres                 // TODO add test
+	DialectMysql DatabaseDialect = iota + 1
+	DialectPostgres
 )
 
 type Executor[T TableNamer] struct {
@@ -80,7 +80,7 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 }
 
 func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) ([]any, bool) {
-	builder, table := NewCondBuilder[T](e.dialect)
+	builder, table := NewCondBuilder[T](e.schema, e.dialect)
 	cond(builder, table)
 	if builder.IsEmpty() {
 		return nil, true
@@ -305,7 +305,6 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 		buf.WriteString(" RETURNING ")
 		buf.WriteString(e.schema.fieldInfos[idOffset].dbName)
 		var result []int64
-		// TODO add rebind
 		if err := tx.SelectContext(ctx, &result, buf.String(), allArgs...); err != nil {
 			return err
 		}
@@ -387,6 +386,36 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
 	return err
+}
+
+func (e *Executor[T]) UpdateCond(
+	ctx context.Context,
+	updateFunc UpdateBuilderFunc[T],
+	condFunc CondBuilderFunc[T],
+) (int64, error) {
+	// TODO make sure cond is not empty
+
+	var buf strings.Builder
+	buf.WriteString("UPDATE ")
+	var emptyVal T
+	buf.WriteString(e.quoteIdent(emptyVal.TableName()))
+	buf.WriteString(" SET ")
+
+	updateBuilder, updateTable := NewUpdateBuilder(e.schema, e.dialect)
+	updateFunc(updateBuilder, updateTable)
+
+	args := updateBuilder.args
+	buf.WriteString(strings.Join(updateBuilder.exprList, ", "))
+
+	condArgs, isEmpty := e.buildWhereCondFromCond(&buf, condFunc)
+	if isEmpty {
+		return 0, fmt.Errorf("not allow empty where condition")
+	}
+	args = append(args, condArgs...)
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return 0, err
 }
 
 // TODO update multi

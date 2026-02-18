@@ -43,6 +43,17 @@ func (tableTest03) TableName() string {
 	return "table_test03"
 }
 
+var tableTest03Schema = RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+	SchemaIDAutoInc(s, &table.ID)
+
+	SchemaConst(s, &table.RoleID)
+	SchemaConst(s, &table.Username)
+	SchemaEditable(s, &table.Age)
+
+	SchemaIgnore(s, &table.CreatedAt)
+	SchemaIgnore(s, &table.UpdatedAt)
+})
+
 // ------------------------------
 
 type tableTest04 struct {
@@ -70,3 +81,13 @@ type tableTest05 struct {
 func (tableTest05) TableName() string {
 	return "table_test05"
 }
+
+var tableTest05Schema = RegisterSchema(func(s *Schema[tableTest05], table *tableTest05) {
+	SchemaIDAutoInc(s, &table.ID)
+
+	SchemaConst(s, &table.RoleID)
+	SchemaConst(s, &table.Username)
+	SchemaEditable(s, &table.Age)
+
+	SchemaIgnore(s, &table.CreatedAt)
+})

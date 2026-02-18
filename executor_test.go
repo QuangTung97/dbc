@@ -342,6 +342,42 @@ func TestExecutor_MySQL__Update(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__Update_Cond(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do update cond
+	_, err := exec.UpdateCond(
+		e.ctx,
+		func(b *UpdateBuilder[tableTest03], table *tableTest03) {
+			UpdateAssign(b, &table.Age, 41)
+			UpdateAssign(b, &table.Username, "user02")
+		},
+		func(b *CondBuilder[tableTest03], table *tableTest03) {
+			CondEqual(b, &table.RoleID, testRoleID(11))
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"UPDATE `table_test03`",
+			"SET `age` = ?, `username` = ?",
+			"WHERE `role_id` = ?",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		41, "user02", testRoleID(11),
+	}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__Delete(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()
