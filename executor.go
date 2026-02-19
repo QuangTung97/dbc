@@ -254,16 +254,12 @@ func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType,
 	buf.WriteString(") VALUES ")
 	return normalFields, autoIncField
 }
-func (e *Executor[T]) validateFieldNonZero(info fieldInfo, entity reflect.Value) error {
-	if info.specType.isIgnored() {
-		return nil
-	}
 
+func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Value) error {
 	if info.isOptional {
 		return nil
 	}
 
-	fieldVal := getStructFieldAt(entity, info.indices)
 	if !fieldVal.IsZero() {
 		return nil
 	}
@@ -275,11 +271,30 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, entity reflect.Value)
 	return fmt.Errorf("field '%s' of type '%s' must not be zero", fieldName, typeName)
 }
 
+func (e *Executor[T]) validateFieldValue(info fieldInfo, entity reflect.Value) error {
+	if info.specType.isIgnored() {
+		return nil
+	}
+
+	fieldVal := getStructFieldAt(entity, info.indices)
+	if err := e.validateFieldNonZero(info, fieldVal); err != nil {
+		return err
+	}
+
+	for _, fn := range info.validatorList {
+		if err := fn(fieldVal.Interface()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
 		if !info.isAutoInc {
-			if err := e.validateFieldNonZero(info, entity); err != nil {
+			if err := e.validateFieldValue(info, entity); err != nil {
 				return err
 			}
 		}
@@ -290,7 +305,7 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 func (e *Executor[T]) validateUpdateEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
-		if err := e.validateFieldNonZero(info, entity); err != nil {
+		if err := e.validateFieldValue(info, entity); err != nil {
 			return err
 		}
 	}
@@ -331,6 +346,14 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 }
 
 func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
+	for _, entity := range entities {
+		entityVal := reflect.ValueOf(entity).Elem()
+		if err := e.validateInsertEntity(entityVal); err != nil {
+			// TODO testing
+			return err
+		}
+	}
+
 	var buf strings.Builder
 	normalFields, autoIncField := e.buildInsertQuery(&buf)
 
@@ -453,6 +476,8 @@ func (e *Executor[T]) UpdateCond(
 
 	updateBuilder, updateTable := NewUpdateBuilder(e.schema, e.dialect)
 	updateFunc(updateBuilder, updateTable)
+
+	// TODO Validate Updated Columns
 
 	args := updateBuilder.args
 	buf.WriteString(strings.Join(updateBuilder.exprList, ", "))

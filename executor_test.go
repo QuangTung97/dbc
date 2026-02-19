@@ -189,6 +189,42 @@ func TestExecutor_MySQL__Insert__Validate_Error(t *testing.T) {
 	assert.Equal(t, 0, len(e.execQueries))
 }
 
+func TestExecutor_MySQL__Insert__Custom_Validator(t *testing.T) {
+	e := newExecTest(t)
+
+	// init schema and executor
+	schema := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+		SchemaIDAutoInc(s, &table.ID)
+		SchemaConst(s, &table.RoleID)
+
+		SchemaEditable(s, &table.Username)
+		SchemaEditable(s, &table.Age)
+		ValidateFunc(s, &table.Age, func(value int) error {
+			if value < 40 {
+				return errors.New("age must >= 40")
+			}
+			return nil
+		})
+
+		SchemaIgnore(s, &table.CreatedAt)
+		SchemaIgnore(s, &table.UpdatedAt)
+	})
+	exec, _ := NewExecutor(DialectMysql, schema)
+
+	entity := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+
+	// do insert
+	err := exec.Insert(e.ctx, &entity)
+	assert.Equal(t, errors.New("age must >= 40"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL__Insert__ID_Not_Auto_Inc(t *testing.T) {
 	e := newExecTest(t)
 	e.schema = RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {

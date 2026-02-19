@@ -1,6 +1,7 @@
 package dbc
 
 import (
+	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -50,6 +51,7 @@ type checkType int
 const (
 	checkTypeSpec checkType = iota + 1
 	checkTypeValidateOptional
+	checkTypeValidateFunc
 )
 
 func newSchemaDefinition[T any]() *schemaDefinition[T] {
@@ -252,7 +254,7 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 // Schema Validation Functions
 // ==========================================
 
-// TODO when inserting, validate id not exist
+// TODO when inserting, validate id must be zero
 
 func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeValidateOptional)
@@ -261,9 +263,25 @@ func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
 	})
 }
 
-// TODO add generic validate func
-
 func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) error) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeValidateFunc)
+
+	validateFunc := func(val any) error {
+		fieldVal, ok := val.(F)
+		if !ok {
+			// TODO testing
+			var fieldObj F
+			return fmt.Errorf(
+				"can not convert to field value type: '%s'",
+				reflect.TypeOf(fieldObj).String(),
+			)
+		}
+		return fn(fieldVal)
+	}
+
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.validatorList = append(info.validatorList, validateFunc)
+	})
 }
 
 // ==========================================
