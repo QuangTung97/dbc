@@ -255,6 +255,10 @@ func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType,
 	return normalFields, autoIncField
 }
 func (e *Executor[T]) validateFieldNonZero(info fieldInfo, entity reflect.Value) error {
+	if info.specType.isIgnored() {
+		return nil
+	}
+
 	if info.isOptional {
 		return nil
 	}
@@ -274,14 +278,20 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, entity reflect.Value)
 func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
-		if info.specType.isIgnored() {
-			continue
-		}
-
 		if !info.isAutoInc {
 			if err := e.validateFieldNonZero(info, entity); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (e *Executor[T]) validateUpdateEntity(entity reflect.Value) error {
+	for _, offset := range e.schema.allFields {
+		info := e.schema.fieldInfos[offset]
+		if err := e.validateFieldNonZero(info, entity); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -381,12 +391,16 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 }
 
 func (e *Executor[T]) Update(ctx context.Context, entity T) error {
+	entityVal := reflect.ValueOf(entity)
+	if err := e.validateUpdateEntity(entityVal); err != nil {
+		return err
+	}
+
 	var buf strings.Builder
 	buf.WriteString("UPDATE ")
 	buf.WriteString(e.quoteIdent(entity.TableName()))
 	buf.WriteString(" SET ")
 
-	entityVal := reflect.ValueOf(entity)
 	fieldCount := 0
 	var args []any
 

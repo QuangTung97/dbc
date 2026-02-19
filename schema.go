@@ -37,8 +37,20 @@ type schemaDefinition[T any] struct {
 	tableAddr      unsafe.Pointer
 	tableType      reflect.Type
 	fieldOffsetMap map[fieldOffsetType]reflect.StructField
-	checkedFields  map[fieldOffsetType]struct{}
+	checkedFields  map[checkFieldKey]struct{}
 }
+
+type checkFieldKey struct {
+	offset fieldOffsetType
+	typ    checkType
+}
+
+type checkType int
+
+const (
+	checkTypeSpec checkType = iota + 1
+	checkTypeValidateOptional
+)
 
 func newSchemaDefinition[T any]() *schemaDefinition[T] {
 	var emptyValue T
@@ -46,7 +58,7 @@ func newSchemaDefinition[T any]() *schemaDefinition[T] {
 		table:          &emptyValue,
 		tableType:      reflect.TypeOf(emptyValue),
 		fieldOffsetMap: map[fieldOffsetType]reflect.StructField{},
-		checkedFields:  map[fieldOffsetType]struct{}{},
+		checkedFields:  map[checkFieldKey]struct{}{},
 	}
 
 	d.tableAddr = unsafe.Pointer(d.table)
@@ -133,7 +145,11 @@ func RegisterSchema[T TableNamer](
 
 	for _, offset := range s.allFields {
 		fieldType := s.def.fieldOffsetMap[offset]
-		_, ok := s.def.checkedFields[offset]
+		key := checkFieldKey{
+			offset: offset,
+			typ:    checkTypeSpec,
+		}
+		_, ok := s.def.checkedFields[key]
 		if !ok {
 			panicFormat("missing column spec of field '%s' in type '%s'", fieldType.Name, s.getTableTypeName())
 		}
@@ -154,7 +170,7 @@ func (s *Schema[T]) getDef() *schemaDefinition[T] {
 	return s.def
 }
 
-func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
+func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer, checkFieldType checkType) fieldOffsetType {
 	def := s.getDef()
 
 	offset := unsafePointerSub(fieldPtr, def.tableAddr)
@@ -163,16 +179,20 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer) fieldOffsetType {
 		panicFormat("invalid field address value")
 	}
 
-	if _, existed := def.checkedFields[offset]; existed {
+	checkKey := checkFieldKey{
+		offset: offset,
+		typ:    checkFieldType,
+	}
+	if _, existed := def.checkedFields[checkKey]; existed {
 		panicFormat("field '%s' in type '%s' has already been specified", fieldType.Name, s.getTableTypeName())
 	}
+	def.checkedFields[checkKey] = struct{}{}
 
-	def.checkedFields[offset] = struct{}{}
 	return offset
 }
 
 func doSchemaIDInt64[T TableNamer, F ~int64](s *Schema[T], field *F) fieldOffsetType {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.primaryKeyDefined = true
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.isPrimaryKey = true
@@ -193,7 +213,7 @@ func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
 }
 
 func SchemaCompositePrimaryKey[T TableNamer, F any](s *Schema[T], field *F) {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.primaryKeyDefined = true
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.isPrimaryKey = true
@@ -208,21 +228,21 @@ func (s *Schema[T]) updateFieldInfo(offset fieldOffsetType, fn func(info *fieldI
 }
 
 func SchemaConst[T TableNamer, F any](s *Schema[T], field *F) {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.specType = fieldSpecConst
 	})
 }
 
 func SchemaEditable[T TableNamer, F any](s *Schema[T], field *F) {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.specType = fieldSpecEditable
 	})
 }
 
 func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
-	offset := s.getOffsetOfField(unsafe.Pointer(field))
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
 		info.specType = fieldSpecIgnored
 	})
@@ -232,13 +252,16 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 // Schema Validation Functions
 // ==========================================
 
-// TODO add validator
-// TODO update logic for Insert & Update
-
 // TODO when inserting, validate id not exist
 
 func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
+	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeValidateOptional)
+	s.updateFieldInfo(offset, func(info *fieldInfo) {
+		info.isOptional = true
+	})
 }
+
+// TODO add generic validate func
 
 func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) error) {
 }

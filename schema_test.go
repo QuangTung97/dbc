@@ -137,3 +137,23 @@ func TestRegisterSchema_Normal__Use_Definition_Function_Outside(t *testing.T) {
 		SchemaEditable(s, new(int))
 	})
 }
+
+func TestRegisterSchema__Duplicated_Validate_Optional(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(t, "field 'Username' in type 'dbc.tableTest03' has already been specified", func() {
+		RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+			SchemaIDInt64(s, &table.ID)
+			SchemaConst(s, &table.RoleID)
+
+			SchemaEditable(s, &table.Username)
+			SchemaEditable(s, &table.Age)
+
+			ValidateOptional(s, &table.Username)
+			ValidateOptional(s, &table.Age)
+			ValidateOptional(s, &table.Username)
+
+			SchemaIgnore(s, &table.CreatedAt)
+			SchemaIgnore(s, &table.UpdatedAt)
+		})
+	})
+}

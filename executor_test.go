@@ -360,6 +360,52 @@ func TestExecutor_MySQL__Update(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__Update__With_Optional_Age(t *testing.T) {
+	e := newExecTest(t)
+
+	schema := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+		SchemaIDAutoInc(s, &table.ID)
+		SchemaConst(s, &table.RoleID)
+
+		SchemaEditable(s, &table.Username)
+		SchemaEditable(s, &table.Age)
+		ValidateOptional(s, &table.Age)
+
+		SchemaIgnore(s, &table.CreatedAt)
+		SchemaIgnore(s, &table.UpdatedAt)
+	})
+	exec, _ := NewExecutor(DialectMysql, schema)
+
+	entity := tableTest03{
+		ID:       11,
+		RoleID:   21,
+		Username: "user01",
+	}
+
+	// do update
+	err := exec.Update(e.ctx, entity)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"UPDATE `table_test03`",
+			"SET `username` = ?, `age` = ?",
+			"WHERE `id` = ?",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity.Username, entity.Age,
+		entity.ID,
+	}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__Update_Cond(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()
