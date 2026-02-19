@@ -254,13 +254,49 @@ func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType,
 	buf.WriteString(") VALUES ")
 	return normalFields, autoIncField
 }
+func (e *Executor[T]) validateFieldNonZero(info fieldInfo, entity reflect.Value) error {
+	if info.isOptional {
+		return nil
+	}
+
+	fieldVal := getStructFieldAt(entity, info.indices)
+	if !fieldVal.IsZero() {
+		return nil
+	}
+
+	var empty T
+	structType := reflect.TypeOf(empty)
+	typeName := structType.String()
+	fieldName := getStructFieldTypeAt(structType, info.indices).Name
+	return fmt.Errorf("field '%s' of type '%s' must not be zero", fieldName, typeName)
+}
+
+func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
+	for _, offset := range e.schema.allFields {
+		info := e.schema.fieldInfos[offset]
+		if info.specType.isIgnored() {
+			continue
+		}
+
+		if !info.isAutoInc {
+			if err := e.validateFieldNonZero(info, entity); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
+	entityVal := reflect.ValueOf(entity).Elem()
+	if err := e.validateInsertEntity(entityVal); err != nil {
+		return err
+	}
+
 	var buf strings.Builder
 	normalFields, autoIncField := e.buildInsertQuery(&buf)
 	e.buildPlaceholderLen(&buf, len(normalFields))
 
-	entityVal := reflect.ValueOf(entity).Elem()
 	args := e.getValuesOfEntity(normalFields, entityVal)
 
 	// execute insert

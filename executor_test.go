@@ -171,6 +171,24 @@ func TestExecutor_MySQL__Insert(t *testing.T) {
 	assert.Equal(t, int64(61), entity.ID)
 }
 
+func TestExecutor_MySQL__Insert__Validate_Error(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	entity := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      0,
+	}
+
+	// do insert
+	err := exec.Insert(e.ctx, &entity)
+	assert.Equal(t, errors.New("field 'Age' of type 'dbc.tableTest03' must not be zero"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL__Insert__ID_Not_Auto_Inc(t *testing.T) {
 	e := newExecTest(t)
 	e.schema = RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {

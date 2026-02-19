@@ -75,6 +75,15 @@ func (t fieldSpecType) isVisible() bool {
 	}
 }
 
+func (t fieldSpecType) isIgnored() bool {
+	switch t {
+	case fieldSpecIgnored:
+		return true
+	default:
+		return false
+	}
+}
+
 type structFieldIndices []int
 
 type fieldInfo struct {
@@ -83,7 +92,12 @@ type fieldInfo struct {
 	specType     fieldSpecType
 	isAutoInc    bool
 	isPrimaryKey bool
+
+	isOptional    bool
+	validatorList []func(val any) error
 }
+
+// TODO optional can not be set for primary key
 
 func RegisterSchema[T TableNamer](
 	definitionFn func(s *Schema[T], table *T),

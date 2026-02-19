@@ -29,3 +29,8 @@ func getStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Val
 	// TODO allow nested
 	return val.Field(indices[0])
 }
+
+func getStructFieldTypeAt(structType reflect.Type, indices structFieldIndices) reflect.StructField {
+	// TODO allow nested
+	return structType.Field(indices[0])
+}
