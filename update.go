@@ -40,3 +40,15 @@ func UpdateAssign[T TableNamer, F any](b *UpdateBuilder[T], field *F, val F) {
 	b.exprList = append(b.exprList, b.quoteIdent(info.dbName)+" = ?")
 	b.args = append(b.args, val)
 }
+
+func UpdateColumnExpr[T TableNamer, F any](
+	b *UpdateBuilder[T], field *F,
+	exprFunc func(col string) string,
+	args ...any,
+) {
+	offset := unsafePointerSub(unsafe.Pointer(field), b.basePtr)
+	info := b.schema.getFieldInfo(offset)
+	colName := b.quoteIdent(info.dbName)
+	b.exprList = append(b.exprList, colName+" = "+exprFunc(colName))
+	b.args = append(b.args, args...)
+}
