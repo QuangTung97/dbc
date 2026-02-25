@@ -271,12 +271,16 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Valu
 	return fmt.Errorf("field '%s' of struct '%s' must not be zero", fieldName, typeName)
 }
 
-func (e *Executor[T]) validateFieldValue(info fieldInfo, entity reflect.Value) error {
+func (e *Executor[T]) validateFieldValueOfEntity(info fieldInfo, entity reflect.Value) error {
+	fieldVal := getStructFieldAt(entity, info.indices)
+	return e.validateFieldValue(info, fieldVal)
+}
+
+func (e *Executor[T]) validateFieldValue(info fieldInfo, fieldVal reflect.Value) error {
 	if info.specType.isIgnored() {
 		return nil
 	}
 
-	fieldVal := getStructFieldAt(entity, info.indices)
 	if err := e.validateFieldNonZero(info, fieldVal); err != nil {
 		return err
 	}
@@ -302,7 +306,7 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 				return fmt.Errorf("field '%s' of struct '%s' must be zero", fieldName, tableType.String())
 			}
 		} else {
-			if err := e.validateFieldValue(info, entity); err != nil {
+			if err := e.validateFieldValueOfEntity(info, entity); err != nil {
 				return err
 			}
 		}
@@ -313,7 +317,7 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 func (e *Executor[T]) validateUpdateEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
-		if err := e.validateFieldValue(info, entity); err != nil {
+		if err := e.validateFieldValueOfEntity(info, entity); err != nil {
 			return err
 		}
 	}
@@ -486,7 +490,13 @@ func (e *Executor[T]) UpdateCond(
 		return 0, fmt.Errorf("not allow empty update expression")
 	}
 
-	// TODO Validate Updated Columns
+	// validate values of simple updated columns
+	for _, simpleUpdate := range updateBuilder.simpleUpdateList {
+		info := e.schema.getFieldInfo(simpleUpdate.offset)
+		if err := e.validateFieldValue(info, reflect.ValueOf(simpleUpdate.value)); err != nil {
+			return 0, err
+		}
+	}
 
 	args := updateBuilder.args
 	buf.WriteString(strings.Join(updateBuilder.exprList, ", "))

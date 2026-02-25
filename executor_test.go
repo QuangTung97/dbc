@@ -535,6 +535,50 @@ func TestExecutor_MySQL__Update_Cond(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__Update_Cond__Username_Empty__Error(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecWithSchema(
+		newSchemaTable03WithValidate(),
+	)
+
+	// do update cond
+	_, err := exec.UpdateCond(
+		e.ctx,
+		func(b *UpdateBuilder[tableTest03], table *tableTest03) {
+			UpdateAssign(b, &table.Username, "")
+		},
+		func(b *CondBuilder[tableTest03], table *tableTest03) {
+			CondEqual(b, &table.RoleID, testRoleID(11))
+		},
+	)
+	assert.Equal(t, errors.New("field 'Username' of struct 'dbc.tableTest03' must not be zero"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
+func TestExecutor_MySQL__Update_Cond__Age_Less_Than_40(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecWithSchema(
+		newSchemaTable03WithValidate(),
+	)
+
+	// do update cond
+	_, err := exec.UpdateCond(
+		e.ctx,
+		func(b *UpdateBuilder[tableTest03], table *tableTest03) {
+			UpdateAssign(b, &table.Age, 31)
+		},
+		func(b *CondBuilder[tableTest03], table *tableTest03) {
+			CondEqual(b, &table.RoleID, testRoleID(11))
+		},
+	)
+	assert.Equal(t, errors.New("age must >= 40"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL__Update_Cond__With_Generic_Func(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()

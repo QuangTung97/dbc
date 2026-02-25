@@ -10,6 +10,13 @@ type UpdateBuilder[T TableNamer] struct {
 
 	exprList []string
 	args     []any
+
+	simpleUpdateList []simpleUpdateInfo
+}
+
+type simpleUpdateInfo struct {
+	offset fieldOffsetType
+	value  any
 }
 
 func NewUpdateBuilder[T TableNamer](
@@ -37,8 +44,15 @@ func (b *UpdateBuilder[T]) quoteIdent(name string) string {
 func UpdateAssign[T TableNamer, F any](b *UpdateBuilder[T], field *F, val F) {
 	offset := unsafePointerSub(unsafe.Pointer(field), b.basePtr)
 	info := b.schema.getFieldInfo(offset)
+
 	b.exprList = append(b.exprList, b.quoteIdent(info.dbName)+" = ?")
 	b.args = append(b.args, val)
+
+	// for validation
+	b.simpleUpdateList = append(b.simpleUpdateList, simpleUpdateInfo{
+		offset: offset,
+		value:  val,
+	})
 }
 
 func UpdateColumnExpr[T TableNamer, F any](
