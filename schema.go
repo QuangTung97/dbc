@@ -111,8 +111,6 @@ type fieldInfo struct {
 	validatorList []func(val any) error
 }
 
-// TODO optional can not be set for primary key
-
 func RegisterSchema[T TableNamer](
 	definitionFn func(s *Schema[T], table *T),
 ) *Schema[T] {
@@ -154,6 +152,14 @@ func RegisterSchema[T TableNamer](
 		_, ok := s.def.checkedFields[key]
 		if !ok {
 			panicFormat("missing column spec of field '%s' of struct '%s'", fieldType.Name, s.getTableTypeName())
+		}
+
+		info := s.fieldInfos[offset]
+		if info.isPrimaryKey && info.isOptional {
+			panicFormat(
+				"can not config optional for primary column '%s' of struct '%s'",
+				fieldType.Name, s.getTableTypeName(),
+			)
 		}
 	}
 

@@ -157,3 +157,27 @@ func TestRegisterSchema__Duplicated_Validate_Optional(t *testing.T) {
 		})
 	})
 }
+
+func TestRegisterSchema__Optional_Of_ID_Column__Failed(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(
+		t,
+		"can not config optional for primary column 'ID' of struct 'dbc.tableTest03'",
+		func() {
+			RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+				SchemaIDInt64(s, &table.ID)
+				SchemaConst(s, &table.RoleID)
+
+				SchemaEditable(s, &table.Username)
+				SchemaEditable(s, &table.Age)
+
+				ValidateOptional(s, &table.ID)
+				ValidateOptional(s, &table.Username)
+				ValidateOptional(s, &table.Age)
+
+				SchemaIgnore(s, &table.CreatedAt)
+				SchemaIgnore(s, &table.UpdatedAt)
+			})
+		},
+	)
+}

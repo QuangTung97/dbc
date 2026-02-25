@@ -512,9 +512,8 @@ func (e *Executor[T]) UpdateCond(
 	return 0, err
 }
 
-// TODO update multi
-// TODO update with condition
-// TODO add insert or update multi
+// TODO update multi (for both MySQL and Postgres)
+// TODO add insert or update multi (for both MySQL and Postgres)
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	var buf strings.Builder
