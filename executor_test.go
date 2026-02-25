@@ -76,6 +76,14 @@ func (e *executorTest) newExec() *Executor[tableTest03] {
 	return exec
 }
 
+func (e *executorTest) newExecWithSchema(schema *Schema[tableTest03]) *Executor[tableTest03] {
+	exec, err := NewExecutor(DialectMysql, schema)
+	if err != nil {
+		panic(err)
+	}
+	return exec
+}
+
 func (e *executorTest) newExecPostgres() *Executor[tableTest03] {
 	exec, err := NewExecutor(DialectPostgres, e.schema)
 	if err != nil {
@@ -189,11 +197,8 @@ func TestExecutor_MySQL__Insert__Validate_Error(t *testing.T) {
 	assert.Equal(t, 0, len(e.execQueries))
 }
 
-func TestExecutor_MySQL__Insert__Custom_Validator(t *testing.T) {
-	e := newExecTest(t)
-
-	// init schema and executor
-	schema := RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
+func newSchemaTable03WithValidate() *Schema[tableTest03] {
+	return RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
 		SchemaIDAutoInc(s, &table.ID)
 		SchemaConst(s, &table.RoleID)
 
@@ -209,7 +214,14 @@ func TestExecutor_MySQL__Insert__Custom_Validator(t *testing.T) {
 		SchemaIgnore(s, &table.CreatedAt)
 		SchemaIgnore(s, &table.UpdatedAt)
 	})
-	exec, _ := NewExecutor(DialectMysql, schema)
+}
+
+func TestExecutor_MySQL__Insert__Custom_Validator(t *testing.T) {
+	e := newExecTest(t)
+
+	// init schema and executor
+	schema := newSchemaTable03WithValidate()
+	exec := e.newExecWithSchema(schema)
 
 	entity := tableTest03{
 		RoleID:   21,
@@ -361,6 +373,31 @@ func TestExecutor_PostgresL__Insert_Multi(t *testing.T) {
 	assert.Equal(t, int64(66), entity2.ID)
 }
 
+func TestExecutor_MySQL__Insert_Multi__With_Validator_Failed(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecWithSchema(
+		newSchemaTable03WithValidate(),
+	)
+
+	entity1 := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	// do insert
+	err := exec.InsertMulti(e.ctx, []*tableTest03{&entity1, &entity2})
+	assert.Equal(t, errors.New("age must >= 40"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL__Update(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()
@@ -410,7 +447,7 @@ func TestExecutor_MySQL__Update__With_Optional_Age(t *testing.T) {
 		SchemaIgnore(s, &table.CreatedAt)
 		SchemaIgnore(s, &table.UpdatedAt)
 	})
-	exec, _ := NewExecutor(DialectMysql, schema)
+	exec := e.newExecWithSchema(schema)
 
 	entity := tableTest03{
 		ID:       11,
@@ -476,6 +513,45 @@ func TestExecutor_MySQL__Update_Cond(t *testing.T) {
 	assert.Equal(t, []any{
 		41, "user02", testRoleID(11),
 	}, e.execArgs[0])
+}
+
+func TestExecutor_MySQL__Update_Cond__Empty_Where(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do update cond
+	_, err := exec.UpdateCond(
+		e.ctx,
+		func(b *UpdateBuilder[tableTest03], table *tableTest03) {
+			UpdateAssign(b, &table.Age, 41)
+			UpdateAssign(b, &table.Username, "user02")
+		},
+		func(b *CondBuilder[tableTest03], table *tableTest03) {
+		},
+	)
+	assert.Equal(t, errors.New("not allow empty where condition"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
+func TestExecutor_MySQL__Update_Cond__Empty_Update(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExec()
+
+	// do update cond
+	_, err := exec.UpdateCond(
+		e.ctx,
+		func(b *UpdateBuilder[tableTest03], table *tableTest03) {
+		},
+		func(b *CondBuilder[tableTest03], table *tableTest03) {
+			CondEqual(b, &table.RoleID, testRoleID(11))
+		},
+	)
+	assert.Equal(t, errors.New("not allow empty update expression"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
 }
 
 func TestExecutor_MySQL__Delete(t *testing.T) {

@@ -349,7 +349,6 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 	for _, entity := range entities {
 		entityVal := reflect.ValueOf(entity).Elem()
 		if err := e.validateInsertEntity(entityVal); err != nil {
-			// TODO testing
 			return err
 		}
 	}
@@ -466,8 +465,6 @@ func (e *Executor[T]) UpdateCond(
 	updateFunc UpdateBuilderFunc[T],
 	condFunc CondBuilderFunc[T],
 ) (int64, error) {
-	// TODO make sure cond is not empty
-
 	var buf strings.Builder
 	buf.WriteString("UPDATE ")
 	var emptyVal T
@@ -476,6 +473,10 @@ func (e *Executor[T]) UpdateCond(
 
 	updateBuilder, updateTable := NewUpdateBuilder(e.schema, e.dialect)
 	updateFunc(updateBuilder, updateTable)
+
+	if len(updateBuilder.exprList) == 0 {
+		return 0, fmt.Errorf("not allow empty update expression")
+	}
 
 	// TODO Validate Updated Columns
 
