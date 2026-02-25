@@ -18,7 +18,7 @@ func TestRegisterSchema_Missing_ID(t *testing.T) {
 	newTestSchema(t)
 	assert.PanicsWithValue(
 		t,
-		"missing 'id' column or primary key definition in type 'dbc.tableTest01'",
+		"missing 'id' column or primary key definition of struct 'dbc.tableTest01'",
 		func() {
 			RegisterSchema(func(s *Schema[tableTest01], table *tableTest01) {
 			})
@@ -28,7 +28,7 @@ func TestRegisterSchema_Missing_ID(t *testing.T) {
 
 func TestRegisterSchema_Not_Found_Struct_Tag_DB(t *testing.T) {
 	newTestSchema(t)
-	assert.PanicsWithValue(t, "missing struct tag of field 'Username' in type 'dbc.tableTest02'", func() {
+	assert.PanicsWithValue(t, "missing struct tag of field 'Username' of struct 'dbc.tableTest02'", func() {
 		RegisterSchema(func(s *Schema[tableTest02], table *tableTest02) {
 			SchemaIDInt64(s, &table.ID)
 		})
@@ -58,7 +58,7 @@ func TestRegisterSchema_Normal(t *testing.T) {
 
 func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
 	newTestSchema(t)
-	assert.PanicsWithValue(t, "missing column spec of field 'Username' in type 'dbc.tableTest03'", func() {
+	assert.PanicsWithValue(t, "missing column spec of field 'Username' of struct 'dbc.tableTest03'", func() {
 		RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
 			SchemaIDInt64(s, &table.ID)
 			SchemaConst(s, &table.RoleID)
@@ -87,7 +87,7 @@ func TestRegisterSchema_Composite_Primary_Key__Normal(t *testing.T) {
 
 func TestRegisterSchema_Duplicated_Definition(t *testing.T) {
 	newTestSchema(t)
-	assert.PanicsWithValue(t, "field 'Age' in type 'dbc.tableTest04' has already been specified", func() {
+	assert.PanicsWithValue(t, "field 'Age' of struct 'dbc.tableTest04' has already been specified", func() {
 		RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
 			SchemaCompositePrimaryKey(s, &table.RoleID)
 			SchemaCompositePrimaryKey(s, &table.Username)
@@ -140,7 +140,7 @@ func TestRegisterSchema_Normal__Use_Definition_Function_Outside(t *testing.T) {
 
 func TestRegisterSchema__Duplicated_Validate_Optional(t *testing.T) {
 	newTestSchema(t)
-	assert.PanicsWithValue(t, "field 'Username' in type 'dbc.tableTest03' has already been specified", func() {
+	assert.PanicsWithValue(t, "field 'Username' of struct 'dbc.tableTest03' has already been specified", func() {
 		RegisterSchema(func(s *Schema[tableTest03], table *tableTest03) {
 			SchemaIDInt64(s, &table.ID)
 			SchemaConst(s, &table.RoleID)

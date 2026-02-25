@@ -268,7 +268,7 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Valu
 	structType := reflect.TypeOf(empty)
 	typeName := structType.String()
 	fieldName := getStructFieldTypeAt(structType, info.indices).Name
-	return fmt.Errorf("field '%s' of type '%s' must not be zero", fieldName, typeName)
+	return fmt.Errorf("field '%s' of struct '%s' must not be zero", fieldName, typeName)
 }
 
 func (e *Executor[T]) validateFieldValue(info fieldInfo, entity reflect.Value) error {
@@ -293,7 +293,15 @@ func (e *Executor[T]) validateFieldValue(info fieldInfo, entity reflect.Value) e
 func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
-		if !info.isAutoInc {
+		if info.isAutoInc {
+			fieldVal := getStructFieldAt(entity, info.indices)
+			if !fieldVal.IsZero() {
+				var empty T
+				tableType := reflect.TypeOf(empty)
+				fieldName := getStructFieldTypeAt(tableType, info.indices).Name
+				return fmt.Errorf("field '%s' of struct '%s' must be zero", fieldName, tableType.String())
+			}
+		} else {
 			if err := e.validateFieldValue(info, entity); err != nil {
 				return err
 			}

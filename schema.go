@@ -129,7 +129,7 @@ func RegisterSchema[T TableNamer](
 
 		dbName := field.Tag.Get(DBTag)
 		if len(dbName) == 0 {
-			panicFormat("missing struct tag of field '%s' in type '%s'", field.Name, s.getTableTypeName())
+			panicFormat("missing struct tag of field '%s' of struct '%s'", field.Name, s.getTableTypeName())
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
@@ -142,7 +142,7 @@ func RegisterSchema[T TableNamer](
 
 	// do validate
 	if !s.primaryKeyDefined {
-		panicFormat("missing 'id' column or primary key definition in type '%s'", s.getTableTypeName())
+		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.getTableTypeName())
 	}
 
 	for _, offset := range s.allFields {
@@ -153,7 +153,7 @@ func RegisterSchema[T TableNamer](
 		}
 		_, ok := s.def.checkedFields[key]
 		if !ok {
-			panicFormat("missing column spec of field '%s' in type '%s'", fieldType.Name, s.getTableTypeName())
+			panicFormat("missing column spec of field '%s' of struct '%s'", fieldType.Name, s.getTableTypeName())
 		}
 	}
 
@@ -186,7 +186,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer, checkFieldType che
 		typ:    checkFieldType,
 	}
 	if _, existed := def.checkedFields[checkKey]; existed {
-		panicFormat("field '%s' in type '%s' has already been specified", fieldType.Name, s.getTableTypeName())
+		panicFormat("field '%s' of struct '%s' has already been specified", fieldType.Name, s.getTableTypeName())
 	}
 	def.checkedFields[checkKey] = struct{}{}
 
@@ -253,8 +253,6 @@ func SchemaIgnore[T TableNamer, F any](s *Schema[T], field *F) {
 // ==========================================
 // Schema Validation Functions
 // ==========================================
-
-// TODO when inserting, validate id must be zero
 
 func ValidateOptional[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeValidateOptional)
