@@ -104,7 +104,7 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 		}
 	}()
 
-	val = newContextValue(tx, false, true)
+	val = newContextValue(tx, false)
 	ctx = setToContext(ctx, val)
 
 	err = fn(ctx)
@@ -121,9 +121,9 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 }
 
 func (p *providerImpl) Readonly(ctx context.Context) context.Context {
-	return setToContext(ctx, newContextValue(p.db, true, false))
+	return setToContext(ctx, newContextValue(p.db, true))
 }
 
 func (p *providerImpl) Autocommit(ctx context.Context) context.Context {
-	return setToContext(ctx, newContextValue(p.db, false, false))
+	return setToContext(ctx, newContextValue(p.db, false))
 }

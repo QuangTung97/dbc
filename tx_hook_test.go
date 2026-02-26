@@ -31,7 +31,7 @@ func TestTxHook_Normal(t *testing.T) {
 
 	ctx := setToContext(
 		context.Background(),
-		newContextValue(nil, false, true),
+		newContextValue(nil, false),
 	)
 	state := hook.Get(ctx)
 	state.list = append(state.list, "insert01")
@@ -42,8 +42,7 @@ func TestTxHook_Normal(t *testing.T) {
 	assert.Same(t, state, state2)
 
 	// execute before commit
-	txState, _ := getFromContext(ctx)
-	err := txState.executeBeforeCommit(ctx)
+	err := ExecuteBeforeCommitHooks(ctx)
 	assert.Equal(t, nil, err)
 
 	// check actions
@@ -52,8 +51,13 @@ func TestTxHook_Normal(t *testing.T) {
 		"before-commit:insert01,insert02",
 	}, actions)
 
+	// execute again
+	err = ExecuteBeforeCommitHooks(ctx)
+	assert.Equal(t, nil, err)
+
 	// execute after commit
-	txState.executeAfterCommit(context.Background())
+	ExecuteAfterCommitHooks(ctx)
+	ExecuteAfterCommitHooks(ctx)
 
 	// check actions
 	assert.Equal(t, []string{

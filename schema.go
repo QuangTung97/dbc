@@ -6,6 +6,8 @@ import (
 	"unsafe"
 )
 
+// TODO add schema global registry
+
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
 
