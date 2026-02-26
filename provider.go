@@ -83,7 +83,8 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 		return fn(ctx)
 	}
 
-	// TODO support before transaction and after transaction hook
+	beforeCtx := ctx
+	afterCommitFunc := func(ctx context.Context) {}
 
 	tx, err := p.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -99,20 +100,30 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 			_ = tx.Rollback()
 		} else {
 			err = tx.Commit()
+			afterCommitFunc(beforeCtx)
 		}
 	}()
 
-	val = newContextValue(tx, false)
+	val = newContextValue(tx, false, true)
 	ctx = setToContext(ctx, val)
 
 	err = fn(ctx)
+	if err != nil {
+		return err
+	}
+
+	// setup after commit
+	afterCommitFunc = val.executeAfterCommit
+
+	// execute before commit
+	err = val.executeBeforeCommit(ctx)
 	return err
 }
 
 func (p *providerImpl) Readonly(ctx context.Context) context.Context {
-	return setToContext(ctx, newContextValue(p.db, true))
+	return setToContext(ctx, newContextValue(p.db, true, false))
 }
 
 func (p *providerImpl) Autocommit(ctx context.Context) context.Context {
-	return setToContext(ctx, newContextValue(p.db, false))
+	return setToContext(ctx, newContextValue(p.db, false, false))
 }

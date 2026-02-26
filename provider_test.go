@@ -63,6 +63,26 @@ func getAuthUser(ctx context.Context, id int64) authUser {
 	return result.Data
 }
 
+func newTestHook(actions *[]string) *TxHook[hookStateTest] {
+	return NewTxHook[hookStateTest](
+		func() *hookStateTest {
+			*actions = append(*actions, "init")
+			return &hookStateTest{}
+		},
+		func(ctx context.Context, state *hookStateTest) error {
+			GetTx(ctx)
+			*actions = append(*actions, "before-commit")
+			return nil
+		},
+		func(ctx context.Context, state *hookStateTest) {
+			if ctx != context.Background() {
+				panic("context must be background")
+			}
+			*actions = append(*actions, "after-commit")
+		},
+	)
+}
+
 func TestProvider__Transact__Insert_Then_Get(t *testing.T) {
 	db := newTestDB(t)
 	provider := NewProvider(db)
@@ -72,6 +92,9 @@ func TestProvider__Transact__Insert_Then_Get(t *testing.T) {
 		CreatedAt: 2001,
 	}
 
+	var actions []string
+	hook := newTestHook(&actions)
+
 	err := provider.Transact(context.Background(), func(ctx context.Context) error {
 		insertAuthUser(ctx, &user01)
 		assert.Equal(t, authUser{
@@ -79,9 +102,19 @@ func TestProvider__Transact__Insert_Then_Get(t *testing.T) {
 			Username:  "user01",
 			CreatedAt: 2001,
 		}, getAuthUser(ctx, user01.ID))
+
+		hook.Get(ctx)
+
 		return nil
 	})
 	assert.Equal(t, nil, err)
+
+	// check actions
+	assert.Equal(t, []string{
+		"init",
+		"before-commit",
+		"after-commit",
+	}, actions)
 }
 
 func TestProvider__Transact__Then_Readonly(t *testing.T) {
@@ -115,6 +148,17 @@ func TestProvider__Transact__Then_Readonly(t *testing.T) {
 			CreatedAt: 2003,
 		}
 		insertAuthUser(readCtx, &user03)
+	})
+
+	var actions []string
+	hook := newTestHook(&actions)
+	assert.PanicsWithValue(t, "TxHook.Get() must be run inside a transaction", func() {
+		hook.Get(readCtx)
+	})
+
+	// context background
+	assert.PanicsWithValue(t, "TxHook.Get() must be run inside a transaction", func() {
+		hook.Get(context.Background())
 	})
 }
 
