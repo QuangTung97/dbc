@@ -91,3 +91,41 @@ var tableTest05Schema = RegisterSchema(func(s *Schema[tableTest05], table *table
 
 	SchemaIgnore(s, &table.CreatedAt)
 })
+
+// ------------------------------
+
+type commonTimestamps struct {
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type subSchemaStruct01 struct {
+	Username string `db:"username"`
+	Age      int    `db:"age"`
+	commonTimestamps
+}
+
+func commonTimestampsSchema[T TableNamer](s *Schema[T], common *commonTimestamps) {
+	SchemaIgnore(s, &common.CreatedAt)
+	SchemaIgnore(s, &common.UpdatedAt)
+}
+
+type tableTest06 struct {
+	ID     int64                 `db:"id"`
+	RoleID null.Null[testRoleID] `db:"role_id"`
+	subSchemaStruct01
+}
+
+func (tableTest06) TableName() string {
+	return "table_test06"
+}
+
+var tableTest06Schema = RegisterSchema(func(s *Schema[tableTest06], table *tableTest06) {
+	SchemaIDAutoInc(s, &table.ID)
+
+	SchemaConst(s, &table.RoleID)
+	SchemaConst(s, &table.Username)
+	SchemaEditable(s, &table.Age)
+
+	commonTimestampsSchema(s, &table.commonTimestamps)
+})

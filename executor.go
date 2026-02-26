@@ -36,7 +36,7 @@ func (e *Executor[T]) getValuesOfEntity(
 	result := make([]any, 0, len(offsetList))
 	for _, offset := range offsetList {
 		indices := e.schema.fieldInfos[offset].indices
-		val := getStructFieldAt(entityVal, indices).Interface()
+		val := getValueOfStructFieldAt(entityVal, indices).Interface()
 		result = append(result, val)
 	}
 	return result
@@ -169,8 +169,7 @@ func (e *Executor[T]) buildSelectQuery(
 	}
 
 	buf.WriteString(" FROM ")
-	var emptyValue T
-	buf.WriteString(e.quoteIdent(emptyValue.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 	if withWhere {
 		buf.WriteString(" WHERE ")
 	}
@@ -223,9 +222,7 @@ func (e *Executor[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string)
 func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType, null.Null[fieldOffsetType]) {
 	buf.WriteString("INSERT INTO ")
 
-	var emptyValue T
-
-	buf.WriteString(e.quoteIdent(emptyValue.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 	buf.WriteString(" (")
 
 	var autoIncField null.Null[fieldOffsetType]
@@ -264,15 +261,11 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Valu
 		return nil
 	}
 
-	var empty T
-	structType := reflect.TypeOf(empty)
-	typeName := structType.String()
-	fieldName := getStructFieldTypeAt(structType, info.indices).Name
-	return fmt.Errorf("field '%s' of struct '%s' must not be zero", fieldName, typeName)
+	return fmt.Errorf("field '%s' of struct '%s' must not be zero", info.fieldName, e.schema.typeName)
 }
 
 func (e *Executor[T]) validateFieldValueOfEntity(info fieldInfo, entity reflect.Value) error {
-	fieldVal := getStructFieldAt(entity, info.indices)
+	fieldVal := getValueOfStructFieldAt(entity, info.indices)
 	return e.validateFieldValue(info, fieldVal)
 }
 
@@ -298,12 +291,9 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 	for _, offset := range e.schema.allFields {
 		info := e.schema.fieldInfos[offset]
 		if info.isAutoInc {
-			fieldVal := getStructFieldAt(entity, info.indices)
+			fieldVal := getValueOfStructFieldAt(entity, info.indices)
 			if !fieldVal.IsZero() {
-				var empty T
-				tableType := reflect.TypeOf(empty)
-				fieldName := getStructFieldTypeAt(tableType, info.indices).Name
-				return fmt.Errorf("field '%s' of struct '%s' must be zero", fieldName, tableType.String())
+				return fmt.Errorf("field '%s' of struct '%s' must be zero", info.fieldName, e.schema.typeName)
 			}
 		} else {
 			if err := e.validateFieldValueOfEntity(info, entity); err != nil {
@@ -351,7 +341,7 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 		}
 
 		indices := e.schema.fieldInfos[autoIncOffset].indices
-		getStructFieldAt(entityVal, indices).SetInt(insertID)
+		getValueOfStructFieldAt(entityVal, indices).SetInt(insertID)
 	}
 
 	return err
@@ -396,7 +386,7 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 			}
 			entity := entities[index]
 			entityVal := reflect.ValueOf(entity).Elem()
-			getStructFieldAt(entityVal, idIndices).SetInt(idVal)
+			getValueOfStructFieldAt(entityVal, idIndices).SetInt(idVal)
 		}
 
 		return nil
@@ -417,7 +407,7 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 		idIndices := e.schema.fieldInfos[offset].indices
 		for i, entity := range entities {
 			entityVal := reflect.ValueOf(entity).Elem()
-			getStructFieldAt(entityVal, idIndices).SetInt(lastID + int64(i))
+			getValueOfStructFieldAt(entityVal, idIndices).SetInt(lastID + int64(i))
 		}
 	}
 
@@ -432,7 +422,7 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 
 	var buf strings.Builder
 	buf.WriteString("UPDATE ")
-	buf.WriteString(e.quoteIdent(entity.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 	buf.WriteString(" SET ")
 
 	fieldCount := 0
@@ -479,8 +469,7 @@ func (e *Executor[T]) UpdateCond(
 ) (int64, error) {
 	var buf strings.Builder
 	buf.WriteString("UPDATE ")
-	var emptyVal T
-	buf.WriteString(e.quoteIdent(emptyVal.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 	buf.WriteString(" SET ")
 
 	updateBuilder, updateTable := NewUpdateBuilder(e.schema, e.dialect)
@@ -540,8 +529,7 @@ func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
 func (e *Executor[T]) DeleteCond(ctx context.Context, cond CondBuilderFunc[T]) error {
 	var buf strings.Builder
 	buf.WriteString("DELETE FROM ")
-	var empty T
-	buf.WriteString(e.quoteIdent(empty.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 
 	args, isEmpty := e.buildWhereCondFromCond(&buf, cond)
 	if isEmpty {
@@ -555,8 +543,7 @@ func (e *Executor[T]) DeleteCond(ctx context.Context, cond CondBuilderFunc[T]) e
 
 func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldOffsetType) {
 	buf.WriteString("DELETE FROM ")
-	var empty T
-	buf.WriteString(e.quoteIdent(empty.TableName()))
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
 
 	var primaryKeys []string
 	var primaryOffsets []fieldOffsetType

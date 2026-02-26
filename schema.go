@@ -7,6 +7,7 @@ import (
 )
 
 // TODO add schema global registry
+// TODO validate duplicated db name
 
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
@@ -14,6 +15,8 @@ type Schema[T TableNamer] struct {
 	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
+	typeName          string
+	tableName         string
 	primaryKeyDefined bool
 }
 
@@ -25,22 +28,15 @@ func (s *Schema[T]) getFieldInfo(offset fieldOffsetType) fieldInfo {
 	return info
 }
 
-// TODO support struct embedding
-
 // ========================================
 // Private Types
 // ========================================
 
-func (s *Schema[T]) getTableTypeName() string {
-	return s.def.tableType.String()
-}
-
 type schemaDefinition[T any] struct {
-	table          *T
-	tableAddr      unsafe.Pointer
-	tableType      reflect.Type
-	fieldOffsetMap map[fieldOffsetType]reflect.StructField
-	checkedFields  map[checkFieldKey]struct{}
+	table         *T
+	tableAddr     unsafe.Pointer
+	tableType     reflect.Type
+	checkedFields map[checkFieldKey]struct{}
 }
 
 type checkFieldKey struct {
@@ -59,10 +55,9 @@ const (
 func newSchemaDefinition[T any]() *schemaDefinition[T] {
 	var emptyValue T
 	d := &schemaDefinition[T]{
-		table:          &emptyValue,
-		tableType:      reflect.TypeOf(emptyValue),
-		fieldOffsetMap: map[fieldOffsetType]reflect.StructField{},
-		checkedFields:  map[checkFieldKey]struct{}{},
+		table:         &emptyValue,
+		tableType:     reflect.TypeOf(emptyValue),
+		checkedFields: map[checkFieldKey]struct{}{},
 	}
 
 	d.tableAddr = unsafe.Pointer(d.table)
@@ -103,6 +98,7 @@ func (t fieldSpecType) isIgnored() bool {
 type structFieldIndices []int
 
 type fieldInfo struct {
+	fieldName    string
 	indices      structFieldIndices
 	dbName       string
 	specType     fieldSpecType
@@ -121,20 +117,22 @@ func RegisterSchema[T TableNamer](
 		fieldInfos: map[fieldOffsetType]fieldInfo{},
 	}
 
-	for scanInfo := range traverseFieldsOfType(s.def.tableType) {
-		field := scanInfo.field
-		offset := fieldOffsetType(field.Offset)
-		s.allFields = append(s.allFields, offset)
-		s.def.fieldOffsetMap[offset] = field
+	s.typeName = s.def.tableType.String()
+	s.tableName = (*s.def.table).TableName()
 
-		dbName := field.Tag.Get(DBTag)
+	for scanInfo := range traverseFieldsOfType(s.def.tableType) {
+		offset := fieldOffsetType(scanInfo.offset)
+		s.allFields = append(s.allFields, offset)
+
+		dbName := scanInfo.fieldTag.Get(DBTag)
 		if len(dbName) == 0 {
-			panicFormat("missing struct tag of field '%s' of struct '%s'", field.Name, s.getTableTypeName())
+			panicFormat("missing struct tag of field '%s' of struct '%s'", scanInfo.fieldName, s.typeName)
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
-			indices: scanInfo.indices,
-			dbName:  dbName,
+			fieldName: scanInfo.fieldName,
+			indices:   scanInfo.indices,
+			dbName:    dbName,
 		}
 	}
 
@@ -142,25 +140,24 @@ func RegisterSchema[T TableNamer](
 
 	// do validate
 	if !s.primaryKeyDefined {
-		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.getTableTypeName())
+		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.typeName)
 	}
 
 	for _, offset := range s.allFields {
-		fieldType := s.def.fieldOffsetMap[offset]
+		info := s.fieldInfos[offset]
 		key := checkFieldKey{
 			offset: offset,
 			typ:    checkTypeSpec,
 		}
 		_, ok := s.def.checkedFields[key]
 		if !ok {
-			panicFormat("missing column spec of field '%s' of struct '%s'", fieldType.Name, s.getTableTypeName())
+			panicFormat("missing column spec of field '%s' of struct '%s'", info.fieldName, s.typeName)
 		}
 
-		info := s.fieldInfos[offset]
 		if info.isPrimaryKey && info.isOptional {
 			panicFormat(
 				"can not config optional for primary column '%s' of struct '%s'",
-				fieldType.Name, s.getTableTypeName(),
+				info.fieldName, s.typeName,
 			)
 		}
 	}
@@ -184,7 +181,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer, checkFieldType che
 	def := s.getDef()
 
 	offset := unsafePointerSub(fieldPtr, def.tableAddr)
-	fieldType, ok := def.fieldOffsetMap[offset]
+	info, ok := s.fieldInfos[offset]
 	if !ok {
 		panicFormat("invalid field address value")
 	}
@@ -194,7 +191,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer, checkFieldType che
 		typ:    checkFieldType,
 	}
 	if _, existed := def.checkedFields[checkKey]; existed {
-		panicFormat("field '%s' of struct '%s' has already been specified", fieldType.Name, s.getTableTypeName())
+		panicFormat("field '%s' of struct '%s' has already been specified", info.fieldName, s.typeName)
 	}
 	def.checkedFields[checkKey] = struct{}{}
 

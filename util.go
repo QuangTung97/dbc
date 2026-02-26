@@ -26,31 +26,58 @@ func quoteIdentWithDialect(dialect DatabaseDialect, name string) string {
 	}
 }
 
-func getStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Value {
-	// TODO allow nested
-	return val.Field(indices[0])
-}
-
-func getStructFieldTypeAt(structType reflect.Type, indices structFieldIndices) reflect.StructField {
-	// TODO allow nested
-	return structType.Field(indices[0])
+func getValueOfStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Value {
+	for len(indices) > 0 {
+		val = val.Field(indices[0])
+		indices = indices[1:]
+	}
+	return val
 }
 
 type fieldScanInfo struct {
-	field   reflect.StructField
-	indices structFieldIndices
+	fieldName string
+	fieldTag  reflect.StructTag
+	indices   structFieldIndices
+	offset    uintptr
 }
 
 func traverseFieldsOfType(structType reflect.Type) iter.Seq[fieldScanInfo] {
+	iterFunc := traverseFieldsOfTypeRecursive(structType, nil, 0)
 	return func(yield func(fieldScanInfo) bool) {
+		iterFunc(yield)
+	}
+}
+
+func traverseFieldsOfTypeRecursive(
+	structType reflect.Type, prevIndices []int,
+	startOffset uintptr,
+) func(yield func(fieldScanInfo) bool) bool {
+	return func(yield func(fieldScanInfo) bool) bool {
 		for index := range structType.NumField() {
+			field := structType.Field(index)
+			indices := append(prevIndices, index)
+
+			// handle struct embedding
+			if field.Anonymous {
+				subIter := traverseFieldsOfTypeRecursive(
+					field.Type, indices, startOffset+field.Offset,
+				)
+				if !subIter(yield) {
+					return false
+				}
+				continue
+			}
+
 			info := fieldScanInfo{
-				field:   structType.Field(index),
-				indices: structFieldIndices{index}, // TODO support nested
+				fieldName: field.Name,
+				fieldTag:  field.Tag,
+				indices:   structFieldIndices(indices),
+				offset:    startOffset + field.Offset,
 			}
 			if !yield(info) {
-				return
+				return false
 			}
 		}
+		return true
 	}
 }

@@ -181,3 +181,16 @@ func TestRegisterSchema__Optional_Of_ID_Column__Failed(t *testing.T) {
 		},
 	)
 }
+
+func TestRegisterSchema__Nested__Normal(t *testing.T) {
+	newTestSchema(t)
+
+	// get columns
+	cols := tableTest06Schema.GetColumnNames(func(g *ColumnGetter[tableTest06], table *tableTest06) {
+		ReturnColumn(g, &table.Age)
+		ReturnColumn(g, &table.Username)
+		ReturnColumn(g, &table.CreatedAt)
+		ReturnColumn(g, &table.UpdatedAt)
+	})
+	assert.Equal(t, []string{"age", "username", "created_at", "updated_at"}, cols)
+}

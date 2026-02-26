@@ -418,6 +418,43 @@ func TestExecutor_MySQL__Insert_Multi__With_Validator_Failed(t *testing.T) {
 	assert.Equal(t, 0, len(e.execQueries))
 }
 
+func TestExecutor_MySQL__Insert__With_Nested(t *testing.T) {
+	e := newExecTest(t)
+	exec, _ := NewExecutor(DialectMysql, tableTest06Schema)
+
+	entity := tableTest06{
+		RoleID: null.New(testRoleID(21)),
+		subSchemaStruct01: subSchemaStruct01{
+			Username: "user01",
+			Age:      31,
+		},
+	}
+
+	// do insert
+	err := exec.Insert(e.ctx, &entity)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"INSERT INTO `table_test06` (`role_id`, `username`, `age`)",
+			"VALUES (?, ?, ?)",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity.RoleID, entity.Username, entity.Age,
+	}, e.execArgs[0])
+
+	// check insert id
+	assert.Equal(t, int64(61), entity.ID)
+}
+
 func TestExecutor_MySQL__Update(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExec()
