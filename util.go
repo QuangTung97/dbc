@@ -2,6 +2,7 @@ package dbc
 
 import (
 	"fmt"
+	"iter"
 	"reflect"
 	"unsafe"
 )
@@ -33,4 +34,23 @@ func getStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Val
 func getStructFieldTypeAt(structType reflect.Type, indices structFieldIndices) reflect.StructField {
 	// TODO allow nested
 	return structType.Field(indices[0])
+}
+
+type fieldScanInfo struct {
+	field   reflect.StructField
+	indices structFieldIndices
+}
+
+func traverseFieldsOfType(structType reflect.Type) iter.Seq[fieldScanInfo] {
+	return func(yield func(fieldScanInfo) bool) {
+		for index := range structType.NumField() {
+			info := fieldScanInfo{
+				field:   structType.Field(index),
+				indices: structFieldIndices{index}, // TODO support nested
+			}
+			if !yield(info) {
+				return
+			}
+		}
+	}
 }

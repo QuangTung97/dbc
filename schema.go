@@ -121,8 +121,8 @@ func RegisterSchema[T TableNamer](
 		fieldInfos: map[fieldOffsetType]fieldInfo{},
 	}
 
-	for index := range s.def.tableType.NumField() {
-		field := s.def.tableType.Field(index)
+	for scanInfo := range traverseFieldsOfType(s.def.tableType) {
+		field := scanInfo.field
 		offset := fieldOffsetType(field.Offset)
 		s.allFields = append(s.allFields, offset)
 		s.def.fieldOffsetMap[offset] = field
@@ -133,7 +133,7 @@ func RegisterSchema[T TableNamer](
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
-			indices: structFieldIndices{index}, // TODO handle nested
+			indices: scanInfo.indices,
 			dbName:  dbName,
 		}
 	}
