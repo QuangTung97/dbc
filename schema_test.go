@@ -194,3 +194,18 @@ func TestRegisterSchema__Nested__Normal(t *testing.T) {
 	})
 	assert.Equal(t, []string{"age", "username", "created_at", "updated_at"}, cols)
 }
+
+func TestRegisterSchema__Duplicated_DB_Name__Failed(t *testing.T) {
+	newTestSchema(t)
+	assert.PanicsWithValue(
+		t,
+		"duplicated column name 'role_id' in struct 'dbc.tableTest07'",
+		func() {
+			RegisterSchema(func(s *Schema[tableTest07], table *tableTest07) {
+				SchemaIDInt64(s, &table.ID)
+				SchemaConst(s, &table.RoleID)
+				SchemaEditable(s, &table.Username)
+			})
+		},
+	)
+}

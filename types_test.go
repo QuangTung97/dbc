@@ -129,3 +129,15 @@ var tableTest06Schema = RegisterSchema(func(s *Schema[tableTest06], table *table
 
 	commonTimestampsSchema(s, &table.commonTimestamps)
 })
+
+// ------------------------------
+
+type tableTest07 struct {
+	ID       int64                 `db:"id"`
+	RoleID   null.Null[testRoleID] `db:"role_id"`
+	Username string                `db:"role_id"`
+}
+
+func (tableTest07) TableName() string {
+	return "table_test07"
+}

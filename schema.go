@@ -7,7 +7,6 @@ import (
 )
 
 // TODO add schema global registry
-// TODO validate duplicated db name
 
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
@@ -143,6 +142,7 @@ func RegisterSchema[T TableNamer](
 		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.typeName)
 	}
 
+	allDBName := map[string]struct{}{}
 	for _, offset := range s.allFields {
 		info := s.fieldInfos[offset]
 		key := checkFieldKey{
@@ -153,6 +153,13 @@ func RegisterSchema[T TableNamer](
 		if !ok {
 			panicFormat("missing column spec of field '%s' of struct '%s'", info.fieldName, s.typeName)
 		}
+
+		// validate duplicated db name
+		_, existed := allDBName[info.dbName]
+		if existed {
+			panicFormat("duplicated column name '%s' in struct '%s'", info.dbName, s.typeName)
+		}
+		allDBName[info.dbName] = struct{}{}
 
 		if info.isPrimaryKey && info.isOptional {
 			panicFormat(
