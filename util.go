@@ -36,9 +36,10 @@ func getValueOfStructFieldAt(val reflect.Value, indices structFieldIndices) refl
 
 type fieldScanInfo struct {
 	fieldName string
-	fieldTag  reflect.StructTag
+	dbName    string
 	indices   structFieldIndices
 	offset    uintptr
+	fieldType reflect.Type
 }
 
 func traverseFieldsOfType(structType reflect.Type) iter.Seq[fieldScanInfo] {
@@ -70,9 +71,10 @@ func traverseFieldsOfTypeRecursive(
 
 			info := fieldScanInfo{
 				fieldName: field.Name,
-				fieldTag:  field.Tag,
+				dbName:    field.Tag.Get(DBTag),
 				indices:   structFieldIndices(indices),
 				offset:    startOffset + field.Offset,
+				fieldType: field.Type,
 			}
 			if !yield(info) {
 				return false

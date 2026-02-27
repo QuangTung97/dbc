@@ -261,7 +261,7 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Valu
 		return nil
 	}
 
-	return fmt.Errorf("field '%s' of struct '%s' must not be zero", info.fieldName, e.schema.typeName)
+	return fmt.Errorf("field '%s' of struct '%s' must not be zero", info.fieldName, e.schema.typeString)
 }
 
 func (e *Executor[T]) validateFieldValueOfEntity(info fieldInfo, entity reflect.Value) error {
@@ -293,7 +293,7 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 		if info.isAutoInc {
 			fieldVal := getValueOfStructFieldAt(entity, info.indices)
 			if !fieldVal.IsZero() {
-				return fmt.Errorf("field '%s' of struct '%s' must be zero", info.fieldName, e.schema.typeName)
+				return fmt.Errorf("field '%s' of struct '%s' must be zero", info.fieldName, e.schema.typeString)
 			}
 		} else {
 			if err := e.validateFieldValueOfEntity(info, entity); err != nil {

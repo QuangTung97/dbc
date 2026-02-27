@@ -54,6 +54,26 @@ func TestRegisterSchema_Normal(t *testing.T) {
 		ReturnColumn(g, &table.Username)
 	})
 	assert.Equal(t, []string{"age", "username"}, cols)
+
+	// schema interface func
+	var schema SchemaInterface = s
+	assert.Equal(t, "tableTest03", schema.GetTypeName())
+	assert.Equal(t, "dbc.tableTest03", schema.GetTypeString())
+	assert.Equal(t, "table_test03", schema.GetTableName())
+	assert.Equal(t, "github.com/QuangTung97/dbc", schema.GetPackagePath())
+
+	var infoList []FieldTraverseInfo
+	for info := range schema.TraverseFields() {
+		infoList = append(infoList, info)
+	}
+	assert.Equal(t, 6, len(infoList))
+
+	assert.Equal(t, "ID", infoList[0].Name)
+	assert.Equal(t, "id", infoList[0].DBName)
+	assert.Equal(t, "int64", infoList[0].Type.String())
+
+	assert.Equal(t, "RoleID", infoList[1].Name)
+	assert.Equal(t, "role_id", infoList[1].DBName)
 }
 
 func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
@@ -75,8 +95,8 @@ func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
 func TestRegisterSchema_Composite_Primary_Key__Normal(t *testing.T) {
 	newTestSchema(t)
 	RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
-		SchemaCompositePrimaryKey(s, &table.RoleID)
-		SchemaCompositePrimaryKey(s, &table.Username)
+		SchemaPrimaryKey(s, &table.RoleID)
+		SchemaPrimaryKey(s, &table.Username)
 
 		SchemaEditable(s, &table.Age)
 		SchemaEditable(s, &table.Desc)
@@ -89,8 +109,8 @@ func TestRegisterSchema_Duplicated_Definition(t *testing.T) {
 	newTestSchema(t)
 	assert.PanicsWithValue(t, "field 'Age' of struct 'dbc.tableTest04' has already been specified", func() {
 		RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
-			SchemaCompositePrimaryKey(s, &table.RoleID)
-			SchemaCompositePrimaryKey(s, &table.Username)
+			SchemaPrimaryKey(s, &table.RoleID)
+			SchemaPrimaryKey(s, &table.Username)
 
 			SchemaEditable(s, &table.Age)
 			SchemaConst(s, &table.Age) // failed

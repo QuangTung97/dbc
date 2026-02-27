@@ -57,8 +57,8 @@ func newExecTest(_ *testing.T) *executorTest {
 	})
 
 	e.schemaTable4 = RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
-		SchemaCompositePrimaryKey(s, &table.RoleID)
-		SchemaCompositePrimaryKey(s, &table.Username)
+		SchemaPrimaryKey(s, &table.RoleID)
+		SchemaPrimaryKey(s, &table.Username)
 
 		SchemaEditable(s, &table.Age)
 		SchemaEditable(s, &table.Desc)

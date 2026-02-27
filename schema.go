@@ -2,11 +2,10 @@ package dbc
 
 import (
 	"fmt"
+	"iter"
 	"reflect"
 	"unsafe"
 )
-
-// TODO add schema global registry
 
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
@@ -14,7 +13,7 @@ type Schema[T TableNamer] struct {
 	fieldInfos map[fieldOffsetType]fieldInfo
 	allFields  []fieldOffsetType
 
-	typeName          string
+	typeString        string
 	tableName         string
 	primaryKeyDefined bool
 }
@@ -116,16 +115,16 @@ func RegisterSchema[T TableNamer](
 		fieldInfos: map[fieldOffsetType]fieldInfo{},
 	}
 
-	s.typeName = s.def.tableType.String()
+	s.typeString = s.def.tableType.String()
 	s.tableName = (*s.def.table).TableName()
 
 	for scanInfo := range traverseFieldsOfType(s.def.tableType) {
 		offset := fieldOffsetType(scanInfo.offset)
 		s.allFields = append(s.allFields, offset)
 
-		dbName := scanInfo.fieldTag.Get(DBTag)
+		dbName := scanInfo.dbName
 		if len(dbName) == 0 {
-			panicFormat("missing struct tag of field '%s' of struct '%s'", scanInfo.fieldName, s.typeName)
+			panicFormat("missing struct tag of field '%s' of struct '%s'", scanInfo.fieldName, s.typeString)
 		}
 
 		s.fieldInfos[offset] = fieldInfo{
@@ -139,7 +138,7 @@ func RegisterSchema[T TableNamer](
 
 	// do validate
 	if !s.primaryKeyDefined {
-		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.typeName)
+		panicFormat("missing 'id' column or primary key definition of struct '%s'", s.typeString)
 	}
 
 	allDBName := map[string]struct{}{}
@@ -151,25 +150,27 @@ func RegisterSchema[T TableNamer](
 		}
 		_, ok := s.def.checkedFields[key]
 		if !ok {
-			panicFormat("missing column spec of field '%s' of struct '%s'", info.fieldName, s.typeName)
+			panicFormat("missing column spec of field '%s' of struct '%s'", info.fieldName, s.typeString)
 		}
 
 		// validate duplicated db name
 		_, existed := allDBName[info.dbName]
 		if existed {
-			panicFormat("duplicated column name '%s' in struct '%s'", info.dbName, s.typeName)
+			panicFormat("duplicated column name '%s' in struct '%s'", info.dbName, s.typeString)
 		}
 		allDBName[info.dbName] = struct{}{}
 
 		if info.isPrimaryKey && info.isOptional {
 			panicFormat(
 				"can not config optional for primary column '%s' of struct '%s'",
-				info.fieldName, s.typeName,
+				info.fieldName, s.typeString,
 			)
 		}
 	}
 
 	s.def = nil
+	addToGlobalSchema(s)
+
 	return s
 }
 
@@ -198,7 +199,7 @@ func (s *Schema[T]) getOffsetOfField(fieldPtr unsafe.Pointer, checkFieldType che
 		typ:    checkFieldType,
 	}
 	if _, existed := def.checkedFields[checkKey]; existed {
-		panicFormat("field '%s' of struct '%s' has already been specified", info.fieldName, s.typeName)
+		panicFormat("field '%s' of struct '%s' has already been specified", info.fieldName, s.typeString)
 	}
 	def.checkedFields[checkKey] = struct{}{}
 
@@ -226,7 +227,7 @@ func SchemaIDAutoInc[T TableNamer, F ~int64](s *Schema[T], field *F) {
 	})
 }
 
-func SchemaCompositePrimaryKey[T TableNamer, F any](s *Schema[T], field *F) {
+func SchemaPrimaryKey[T TableNamer, F any](s *Schema[T], field *F) {
 	offset := s.getOffsetOfField(unsafe.Pointer(field), checkTypeSpec)
 	s.primaryKeyDefined = true
 	s.updateFieldInfo(offset, func(info *fieldInfo) {
@@ -321,4 +322,42 @@ func ReturnColumn[T TableNamer, F any](g *ColumnGetter[T], field *F) {
 	offset := unsafePointerSub(unsafe.Pointer(field), g.baseAddr)
 	colName := g.schema.getFieldInfo(offset).dbName
 	g.columns = append(g.columns, colName)
+}
+
+// ==========================================
+// Implementation of SchemaInterface
+// ==========================================
+
+func (s *Schema[T]) GetTypeName() string {
+	var empty T
+	typ := reflect.TypeOf(empty)
+	return typ.Name()
+}
+
+func (s *Schema[T]) GetTypeString() string {
+	return s.typeString
+}
+
+func (s *Schema[T]) GetTableName() string {
+	return s.tableName
+}
+
+func (s *Schema[T]) GetPackagePath() string {
+	var empty T
+	typ := reflect.TypeOf(empty)
+	return typ.PkgPath()
+}
+
+func (s *Schema[T]) TraverseFields() iter.Seq[FieldTraverseInfo] {
+	return func(yield func(FieldTraverseInfo) bool) {
+		var empty T
+		typ := reflect.TypeOf(empty)
+		traverseFieldsOfType(typ)(func(info fieldScanInfo) bool {
+			return yield(FieldTraverseInfo{
+				Name:   info.fieldName,
+				DBName: info.dbName,
+				Type:   info.fieldType,
+			})
+		})
+	}
 }
