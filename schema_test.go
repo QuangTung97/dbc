@@ -1,6 +1,7 @@
 package dbc
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,6 +60,7 @@ func TestRegisterSchema_Normal(t *testing.T) {
 	var schema SchemaInterface = s
 	assert.Equal(t, "tableTest03", schema.GetTypeName())
 	assert.Equal(t, "dbc.tableTest03", schema.GetTypeString())
+	assert.Equal(t, "dbc.tableTest03", schema.GetReflectType().String())
 	assert.Equal(t, "table_test03", schema.GetTableName())
 	assert.Equal(t, "github.com/QuangTung97/dbc", schema.GetPackagePath())
 
@@ -228,4 +230,19 @@ func TestRegisterSchema__Duplicated_DB_Name__Failed(t *testing.T) {
 			})
 		},
 	)
+}
+
+func TestRegisterSchema__Validate_Func__With_Invalid_Object_Type(t *testing.T) {
+	s := newSchemaTable03WithValidate()
+
+	var ageInfo fieldInfo
+	for _, info := range s.fieldInfos {
+		if info.fieldName == "Age" {
+			ageInfo = info
+			break
+		}
+	}
+
+	assert.Equal(t, 1, len(ageInfo.validatorList))
+	assert.Equal(t, errors.New("schema validate: can not convert from 'string' to 'int'"), ageInfo.validatorList[0]("hello"))
 }

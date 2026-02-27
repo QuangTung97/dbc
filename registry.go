@@ -16,6 +16,7 @@ type FieldTraverseInfo struct {
 type SchemaInterface interface {
 	GetTypeName() string
 	GetTypeString() string
+	GetReflectType() reflect.Type
 	GetTableName() string
 	GetPackagePath() string
 	TraverseFields() iter.Seq[FieldTraverseInfo]

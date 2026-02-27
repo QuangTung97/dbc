@@ -280,10 +280,10 @@ func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) 
 	validateFunc := func(val any) error {
 		fieldVal, ok := val.(F)
 		if !ok {
-			// TODO testing
 			var fieldObj F
 			return fmt.Errorf(
-				"can not convert to field value type: '%s'",
+				"schema validate: can not convert from '%s' to '%s'",
+				reflect.TypeOf(val).String(),
 				reflect.TypeOf(fieldObj).String(),
 			)
 		}
@@ -336,6 +336,11 @@ func (s *Schema[T]) GetTypeName() string {
 
 func (s *Schema[T]) GetTypeString() string {
 	return s.typeString
+}
+
+func (s *Schema[T]) GetReflectType() reflect.Type {
+	var empty T
+	return reflect.TypeOf(empty)
 }
 
 func (s *Schema[T]) GetTableName() string {
