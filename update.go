@@ -3,10 +3,7 @@ package dbc
 import "unsafe"
 
 type UpdateBuilder[T TableNamer] struct {
-	basePtr unsafe.Pointer
-	schema  *Schema[T]
-
-	dialect DatabaseDialect
+	common commonBuilder[T]
 
 	exprList []string
 	args     []any
@@ -27,9 +24,11 @@ func NewUpdateBuilder[T TableNamer](
 	obj := &empty
 
 	b := &UpdateBuilder[T]{
-		basePtr: unsafe.Pointer(obj),
-		schema:  schema,
-		dialect: dialect,
+		common: commonBuilder[T]{
+			basePtr: unsafe.Pointer(obj),
+			schema:  schema,
+			dialect: dialect,
+		},
 	}
 
 	return b, obj
@@ -37,15 +36,12 @@ func NewUpdateBuilder[T TableNamer](
 
 type UpdateBuilderFunc[T TableNamer] = func(b *UpdateBuilder[T], table *T)
 
-func (b *UpdateBuilder[T]) quoteIdent(name string) string {
-	return quoteIdentWithDialect(b.dialect, name)
-}
-
 func UpdateAssign[T TableNamer, F any](b *UpdateBuilder[T], field *F, val F) {
-	offset := unsafePointerSub(unsafe.Pointer(field), b.basePtr)
-	info := b.schema.getFieldInfo(offset)
+	offset := unsafePointerSub(unsafe.Pointer(field), b.common.basePtr)
+	info := b.common.schema.getFieldInfo(offset)
+	colName := b.common.quoteIdent(info.dbName)
 
-	b.exprList = append(b.exprList, b.quoteIdent(info.dbName)+" = ?")
+	b.exprList = append(b.exprList, colName+" = ?")
 	b.args = append(b.args, val)
 
 	// for validation
@@ -60,9 +56,7 @@ func UpdateColumnExpr[T TableNamer, F any](
 	exprFunc func(col string) string,
 	args ...any,
 ) {
-	offset := unsafePointerSub(unsafe.Pointer(field), b.basePtr)
-	info := b.schema.getFieldInfo(offset)
-	colName := b.quoteIdent(info.dbName)
+	colName := b.common.getColumnName(unsafe.Pointer(field))
 	b.exprList = append(b.exprList, colName+" = "+exprFunc(colName))
 	b.args = append(b.args, args...)
 }

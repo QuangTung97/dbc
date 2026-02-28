@@ -462,6 +462,55 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	return err
 }
 
+func (e *Executor[T]) UpdateMulti(
+	ctx context.Context,
+	entities []T,
+	// TODO add batch update builder
+) error {
+	var buf strings.Builder
+	var args []any
+
+	buf.WriteString("INSERT INTO ")
+	buf.WriteString(e.quoteIdent(e.schema.tableName))
+	buf.WriteString(" (")
+
+	fieldCount := 0
+	var placeholderBuf strings.Builder
+	for _, offset := range e.schema.allFields {
+		info := e.schema.getFieldInfo(offset)
+		if info.specType.isIgnored() {
+			continue
+		}
+
+		if fieldCount > 0 {
+			buf.WriteString(", ")
+			placeholderBuf.WriteString(", ")
+		}
+		buf.WriteString(e.quoteIdent(info.dbName))
+		placeholderBuf.WriteString("?")
+		fieldCount++
+	}
+
+	buf.WriteString(") VALUES ")
+	for index := range entities {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString("(")
+		buf.WriteString(placeholderBuf.String())
+		buf.WriteString(")")
+	}
+
+	buf.WriteString(" AS new_values")
+	buf.WriteString(" ON DUPLICATE KEY UPDATE")
+
+	// TODO support postgres and older mysql
+
+	tx := GetTx(ctx)
+	_, err := tx.ExecContext(ctx, buf.String(), args...)
+	return err
+}
+
 func (e *Executor[T]) UpdateCond(
 	ctx context.Context,
 	updateFunc UpdateBuilderFunc[T],
