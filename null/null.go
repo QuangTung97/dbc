@@ -259,31 +259,39 @@ type CheckNullOutput struct {
 	DataField  reflect.Value
 }
 
-func IsNullType(val reflect.Value) (CheckNullOutput, bool) {
-	if val.Kind() != reflect.Struct {
-		return CheckNullOutput{}, false
+func IsValidReflectNullType(typ reflect.Type) (reflect.Type, bool) {
+	if typ.Kind() != reflect.Struct {
+		return nil, false
+	}
+	if typ.NumField() != 2 {
+		return nil, false
 	}
 
+	firstField := typ.Field(0)
+	secondField := typ.Field(1)
+
+	if firstField.Type.Kind() != reflect.Bool {
+		return nil, false
+	}
+
+	if firstField.Name != "Valid" {
+		return nil, false
+	}
+	if secondField.Name != "Data" {
+		return nil, false
+	}
+
+	return secondField.Type, true
+}
+
+func IsNullType(val reflect.Value) (CheckNullOutput, bool) {
 	valType := val.Type()
-	if valType.NumField() != 2 {
+	if _, ok := IsValidReflectNullType(valType); !ok {
 		return CheckNullOutput{}, false
 	}
 
 	firstField := val.Field(0)
-	firstFieldType := valType.Field(0)
-
 	secondField := val.Field(1)
-	secondFieldType := valType.Field(1)
-
-	if firstField.Kind() != reflect.Bool {
-		return CheckNullOutput{}, false
-	}
-	if firstFieldType.Name != "Valid" {
-		return CheckNullOutput{}, false
-	}
-	if secondFieldType.Name != "Data" {
-		return CheckNullOutput{}, false
-	}
 
 	output := CheckNullOutput{
 		ValidField: firstField,
