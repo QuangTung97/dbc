@@ -7,6 +7,9 @@ import (
 	"unsafe"
 )
 
+// TODO support adding unique key
+// TODO support adding index
+
 type Schema[T TableNamer] struct {
 	def *schemaDefinition[T]
 

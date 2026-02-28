@@ -44,3 +44,27 @@ func TestCondBuilder_IsNotNull(t *testing.T) {
 	assert.Equal(t, "`role_id` IS NOT NULL", whereCond)
 	assert.Equal(t, []any(nil), args)
 }
+
+func TestCondBuilder_With_Limit(t *testing.T) {
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	CondEqual(c, &table.Username, "user01")
+	CondLimit(c, 20)
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`username` = ? LIMIT ?", whereCond)
+	assert.Equal(t, []any{"user01", 20}, args)
+}
+
+func TestCondBuilder_With_Order_By(t *testing.T) {
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	CondEqual(c, &table.Username, "user01")
+	CondLimit(c, 20)
+	CondOrderBy(c, func(b *OrderByBuilder[tableTest05]) {
+		OrderByAsc(b, &table.RoleID)
+		OrderByDesc(b, &table.Age)
+	})
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`username` = ? ORDER BY `role_id` ASC, `age` DESC LIMIT ?", whereCond)
+	assert.Equal(t, []any{"user01", 20}, args)
+}

@@ -997,8 +997,13 @@ func TestExecutor_MySQL__SelectCond(t *testing.T) {
 	exec := e.newExec()
 
 	// do select by cond
-	_, err := exec.SelectCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {
-		CondEqual(b, &table.Username, "user02")
+	_, err := exec.SelectCond(e.ctx, func(cond *CondBuilder[tableTest03], table *tableTest03) {
+		CondEqual(cond, &table.Username, "user02")
+		CondOrderBy(cond, func(b *OrderByBuilder[tableTest03]) {
+			OrderByAsc(b, &table.Age)
+			OrderByDesc(b, &table.RoleID)
+		})
+		CondLimit(cond, 30)
 	})
 	assert.Equal(t, nil, err)
 
@@ -1010,11 +1015,13 @@ func TestExecutor_MySQL__SelectCond(t *testing.T) {
 			"SELECT `id`, `role_id`, `username`, `age`",
 			"FROM `table_test03`",
 			"WHERE `username` = ?",
+			"ORDER BY `age` ASC, `role_id` DESC",
+			"LIMIT ?",
 		),
 		e.selectQueries[0],
 	)
 
 	// check args
 	assert.Equal(t, 1, len(e.selectArgs))
-	assert.Equal(t, []any{"user02"}, e.selectArgs[0])
+	assert.Equal(t, []any{"user02", 30}, e.selectArgs[0])
 }
