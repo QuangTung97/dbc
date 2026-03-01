@@ -109,6 +109,8 @@ func UpdateMultiColumnExpr[T TableNamer, F any](
 	exprFunc func(oldCol string, newCol string) string,
 ) {
 	dbName := b.common.getColumnName(unsafe.Pointer(field))
-	expr := dbName + " = " + exprFunc(dbName, b.common.computeUpdateMultiNewColumn(dbName))
+	oldName := b.common.computeUpdateMultiOldColumn(dbName)
+	newName := b.common.computeUpdateMultiNewColumn(dbName)
+	expr := dbName + " = " + exprFunc(oldName, newName)
 	b.exprList = append(b.exprList, expr)
 }

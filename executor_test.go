@@ -659,6 +659,63 @@ func TestExecutor_MySQL_5x__Update_Multi(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_Postgres__Update_Multi(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecPostgres()
+
+	entity1 := tableTest03{
+		ID:       11,
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		ID:       12,
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	// do update
+	err := exec.UpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+			UpdateMultiAssign(b, &table.Username)
+			UpdateMultiColumnExpr(b, &table.Age, func(oldCol string, newCol string) string {
+				return oldCol + " + 1"
+			})
+			UpdateMultiColumnExpr(b, &table.RoleID, func(oldCol string, newCol string) string {
+				return newCol + " + 10"
+			})
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			`INSERT INTO "table_test03"`,
+			`("id", "role_id", "username", "age")`,
+			`VALUES`,
+			`(?, ?, ?, ?), (?, ?, ?, ?)`,
+			`ON CONFLICT (id) DO UPDATE SET`,
+			`"username" = EXCLUDED."username",`,
+			`"age" = "table_test03"."age" + 1,`,
+			`"role_id" = EXCLUDED."role_id" + 10`,
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity1.ID, entity1.RoleID, entity1.Username, entity1.Age,
+		entity2.ID, entity2.RoleID, entity2.Username, entity2.Age,
+	}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__Update_Cond(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL()

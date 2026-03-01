@@ -107,6 +107,19 @@ func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
 		return updateMultiNewValues + "." + col
 	case DialectMySQL5x:
 		return "VALUES(" + col + ")"
+	case DialectPostgres:
+		return updateMultiPostgresExcluded + "." + col
+	default:
+		return col
+	}
+}
+
+func (c *commonBuilder[T]) computeUpdateMultiOldColumn(col string) string {
+	switch c.dialect {
+	case DialectMySQL, DialectMySQL5x:
+		return col
+	case DialectPostgres:
+		return c.quoteIdent(c.schema.tableName) + "." + col
 	default:
 		return col
 	}

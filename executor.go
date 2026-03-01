@@ -463,7 +463,10 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	return err
 }
 
-const updateMultiNewValues = "new_values"
+const (
+	updateMultiNewValues        = "new_values"
+	updateMultiPostgresExcluded = "EXCLUDED"
+)
 
 func (e *Executor[T]) UpdateMulti(
 	ctx context.Context,
@@ -479,6 +482,8 @@ func (e *Executor[T]) UpdateMulti(
 	fieldCount := 0
 	var placeholderBuf strings.Builder
 	var offsetList []fieldOffsetType
+	var idColList []string
+
 	for _, offset := range e.schema.allFields {
 		info := e.schema.getFieldInfo(offset)
 		if info.specType.isIgnored() {
@@ -486,6 +491,10 @@ func (e *Executor[T]) UpdateMulti(
 		}
 
 		offsetList = append(offsetList, offset)
+
+		if info.isPrimaryKey {
+			idColList = append(idColList, info.dbName)
+		}
 
 		if fieldCount > 0 {
 			buf.WriteString(", ")
@@ -514,13 +523,18 @@ func (e *Executor[T]) UpdateMulti(
 		buf.WriteString(" AS ")
 		buf.WriteString(updateMultiNewValues)
 	}
-	buf.WriteString(" ON DUPLICATE KEY UPDATE ")
+	switch e.dialect {
+	case DialectMySQL, DialectMySQL5x:
+		buf.WriteString(" ON DUPLICATE KEY UPDATE ")
+	case DialectPostgres:
+		buf.WriteString(" ON CONFLICT (")
+		buf.WriteString(strings.Join(idColList, ", "))
+		buf.WriteString(") DO UPDATE SET ")
+	}
 
 	builder, updateTable := NewUpdateMultiBuilder(e.schema, e.dialect)
 	updateFunc(builder, updateTable)
 	buf.WriteString(builder.GetFullExpr())
-
-	// TODO support postgres and older mysql
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
