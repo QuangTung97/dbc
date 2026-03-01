@@ -12,7 +12,8 @@ import (
 type DatabaseDialect int
 
 const (
-	DialectMysql DatabaseDialect = iota + 1
+	DialectMySQL DatabaseDialect = iota + 1
+	DialectMySQL5x
 	DialectPostgres
 )
 
@@ -509,8 +510,10 @@ func (e *Executor[T]) UpdateMulti(
 		args = append(args, e.getValuesOfEntity(offsetList, reflect.ValueOf(val))...)
 	}
 
-	buf.WriteString(" AS ")
-	buf.WriteString(updateMultiNewValues)
+	if e.dialect == DialectMySQL {
+		buf.WriteString(" AS ")
+		buf.WriteString(updateMultiNewValues)
+	}
 	buf.WriteString(" ON DUPLICATE KEY UPDATE ")
 
 	builder, updateTable := NewUpdateMultiBuilder(e.schema, e.dialect)

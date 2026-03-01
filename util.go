@@ -17,7 +17,7 @@ func unsafePointerSub(a, b unsafe.Pointer) fieldOffsetType {
 
 func quoteIdentWithDialect(dialect DatabaseDialect, name string) string {
 	switch dialect {
-	case DialectMysql:
+	case DialectMySQL, DialectMySQL5x:
 		return "`" + name + "`"
 	case DialectPostgres:
 		return `"` + name + `"`
@@ -99,4 +99,15 @@ func (c *commonBuilder[T]) getColumnName(fieldPtr unsafe.Pointer) string {
 
 func (c *commonBuilder[T]) quoteIdent(name string) string {
 	return quoteIdentWithDialect(c.dialect, name)
+}
+
+func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
+	switch c.dialect {
+	case DialectMySQL:
+		return updateMultiNewValues + "." + col
+	case DialectMySQL5x:
+		return "VALUES(" + col + ")"
+	default:
+		return col
+	}
 }

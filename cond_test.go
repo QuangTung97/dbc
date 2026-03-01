@@ -8,7 +8,7 @@ import (
 )
 
 func TestCondBuilder_Equal(t *testing.T) {
-	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
 	CondEqual(c, &table.RoleID, testRoleID(21))
 
 	whereCond, args := c.GetWhereCond()
@@ -17,7 +17,7 @@ func TestCondBuilder_Equal(t *testing.T) {
 }
 
 func TestCondBuilder_ColumnExpr(t *testing.T) {
-	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
 	CondColumnExpr(c, &table.RoleID, func(col string) string {
 		return fmt.Sprintf("LOWER(%s) = ?", col)
 	}, "hello")
@@ -28,7 +28,7 @@ func TestCondBuilder_ColumnExpr(t *testing.T) {
 }
 
 func TestCondBuilder_IsNull(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondIsNull(c, &table.RoleID)
 
 	whereCond, args := c.GetWhereCond()
@@ -37,7 +37,7 @@ func TestCondBuilder_IsNull(t *testing.T) {
 }
 
 func TestCondBuilder_IsNotNull(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondIsNotNull(c, &table.RoleID)
 
 	whereCond, args := c.GetWhereCond()
@@ -46,7 +46,7 @@ func TestCondBuilder_IsNotNull(t *testing.T) {
 }
 
 func TestCondBuilder_With_Limit(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondEqual(c, &table.Username, "user01")
 	CondLimit(c, 20)
 
@@ -56,7 +56,7 @@ func TestCondBuilder_With_Limit(t *testing.T) {
 }
 
 func TestCondBuilder_With_Order_By(t *testing.T) {
-	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMysql)
+	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondEqual(c, &table.Username, "user01")
 	CondLimit(c, 20)
 	CondOrderBy(c, func(b *OrderByBuilder[tableTest05]) {

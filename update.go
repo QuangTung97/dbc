@@ -100,9 +100,7 @@ func UpdateMultiAssign[T TableNamer, F any](b *UpdateMultiBuilder[T], field *F) 
 	var buf strings.Builder
 	buf.WriteString(dbName)
 	buf.WriteString(" = ")
-	buf.WriteString(updateMultiNewValues)
-	buf.WriteString(".")
-	buf.WriteString(dbName)
+	buf.WriteString(b.common.computeUpdateMultiNewColumn(dbName))
 	b.exprList = append(b.exprList, buf.String())
 }
 
@@ -111,6 +109,6 @@ func UpdateMultiColumnExpr[T TableNamer, F any](
 	exprFunc func(oldCol string, newCol string) string,
 ) {
 	dbName := b.common.getColumnName(unsafe.Pointer(field))
-	expr := dbName + " = " + exprFunc(dbName, updateMultiNewValues+"."+dbName)
+	expr := dbName + " = " + exprFunc(dbName, b.common.computeUpdateMultiNewColumn(dbName))
 	b.exprList = append(b.exprList, expr)
 }
