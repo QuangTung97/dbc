@@ -83,3 +83,20 @@ func traverseFieldsOfTypeRecursive(
 		return true
 	}
 }
+
+// --------------------------------------------------------------------------------------
+
+type commonBuilder[T TableNamer] struct {
+	basePtr unsafe.Pointer
+	schema  *Schema[T]
+	dialect DatabaseDialect
+}
+
+func (c *commonBuilder[T]) getColumnName(fieldPtr unsafe.Pointer) string {
+	offset := unsafePointerSub(fieldPtr, c.basePtr)
+	return c.quoteIdent(c.schema.getFieldInfo(offset).dbName)
+}
+
+func (c *commonBuilder[T]) quoteIdent(name string) string {
+	return quoteIdentWithDialect(c.dialect, name)
+}

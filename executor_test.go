@@ -554,7 +554,18 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 	}
 
 	// do update
-	err := exec.UpdateMulti(e.ctx, []tableTest03{entity1, entity2})
+	err := exec.UpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+			UpdateMultiAssign(b, &table.Username)
+			UpdateMultiColumnExpr(b, &table.Age, func(oldCol string, newCol string) string {
+				return oldCol + " + 1"
+			})
+			UpdateMultiColumnExpr(b, &table.RoleID, func(oldCol string, newCol string) string {
+				return newCol + " + 10"
+			})
+		},
+	)
 	assert.Equal(t, nil, err)
 
 	// check query
@@ -568,7 +579,9 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 			"(?, ?, ?, ?), (?, ?, ?, ?)",
 			"AS new_values",
 			"ON DUPLICATE KEY UPDATE",
-			"`username` = new_values.`username`",
+			"`username` = new_values.`username`,",
+			"`age` = `age` + 1,",
+			"`role_id` = new_values.`role_id` + 10",
 		),
 		e.execQueries[0],
 	)

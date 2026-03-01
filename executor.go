@@ -462,13 +462,14 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 	return err
 }
 
+const updateMultiNewValues = "new_values"
+
 func (e *Executor[T]) UpdateMulti(
 	ctx context.Context,
 	entities []T,
-	// TODO add batch update builder
+	updateFunc UpdateMultiBuilderFunc[T],
 ) error {
 	var buf strings.Builder
-	var args []any
 
 	buf.WriteString("INSERT INTO ")
 	buf.WriteString(e.quoteIdent(e.schema.tableName))
@@ -476,11 +477,14 @@ func (e *Executor[T]) UpdateMulti(
 
 	fieldCount := 0
 	var placeholderBuf strings.Builder
+	var offsetList []fieldOffsetType
 	for _, offset := range e.schema.allFields {
 		info := e.schema.getFieldInfo(offset)
 		if info.specType.isIgnored() {
 			continue
 		}
+
+		offsetList = append(offsetList, offset)
 
 		if fieldCount > 0 {
 			buf.WriteString(", ")
@@ -492,6 +496,7 @@ func (e *Executor[T]) UpdateMulti(
 	}
 
 	buf.WriteString(") VALUES ")
+	var args []any
 	for index := range entities {
 		if index > 0 {
 			buf.WriteString(", ")
@@ -499,10 +504,18 @@ func (e *Executor[T]) UpdateMulti(
 		buf.WriteString("(")
 		buf.WriteString(placeholderBuf.String())
 		buf.WriteString(")")
+
+		val := entities[index]
+		args = append(args, e.getValuesOfEntity(offsetList, reflect.ValueOf(val))...)
 	}
 
-	buf.WriteString(" AS new_values")
-	buf.WriteString(" ON DUPLICATE KEY UPDATE")
+	buf.WriteString(" AS ")
+	buf.WriteString(updateMultiNewValues)
+	buf.WriteString(" ON DUPLICATE KEY UPDATE ")
+
+	builder, updateTable := NewUpdateMultiBuilder(e.schema, e.dialect)
+	updateFunc(builder, updateTable)
+	buf.WriteString(builder.GetFullExpr())
 
 	// TODO support postgres and older mysql
 
@@ -550,7 +563,6 @@ func (e *Executor[T]) UpdateCond(
 	return 0, err
 }
 
-// TODO update multi (for both MySQL and Postgres)
 // TODO add insert or update multi (for both MySQL and Postgres)
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
