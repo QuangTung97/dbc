@@ -931,6 +931,38 @@ func TestExecutor_MySQL__DeleteMulti(t *testing.T) {
 	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__DeleteMulti__Composite_Key(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecTable04()
+
+	entity1 := tableTest04{RoleID: 21, Username: "user01"}
+	entity2 := tableTest04{RoleID: 22, Username: "user02"}
+	entity3 := tableTest04{RoleID: 23, Username: "user03"}
+
+	// do delete
+	err := exec.DeleteMulti(e.ctx, []tableTest04{entity1, entity2, entity3})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"DELETE FROM `table_test04`",
+			"WHERE (`role_id`, `username`) IN ((?, ?), (?, ?), (?, ?))",
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity1.RoleID, entity1.Username,
+		entity2.RoleID, entity2.Username,
+		entity3.RoleID, entity3.Username,
+	}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__DeleteCond(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL()
