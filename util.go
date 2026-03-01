@@ -15,17 +15,6 @@ func unsafePointerSub(a, b unsafe.Pointer) fieldOffsetType {
 	return fieldOffsetType(a) - fieldOffsetType(b)
 }
 
-func quoteIdentWithDialect(dialect DatabaseDialect, name string) string {
-	switch dialect {
-	case DialectMySQL, DialectMySQL5x:
-		return "`" + name + "`"
-	case DialectPostgres:
-		return `"` + name + `"`
-	default:
-		return name
-	}
-}
-
 func getValueOfStructFieldAt(val reflect.Value, indices structFieldIndices) reflect.Value {
 	for len(indices) > 0 {
 		val = val.Field(indices[0])
@@ -98,7 +87,14 @@ func (c *commonBuilder[T]) getColumnName(fieldPtr unsafe.Pointer) string {
 }
 
 func (c *commonBuilder[T]) quoteIdent(name string) string {
-	return quoteIdentWithDialect(c.dialect, name)
+	switch c.dialect {
+	case DialectMySQL, DialectMySQL5x:
+		return "`" + name + "`"
+	case DialectPostgres:
+		return `"` + name + `"`
+	default:
+		return name
+	}
 }
 
 func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {

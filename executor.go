@@ -18,16 +18,17 @@ const (
 )
 
 type Executor[T TableNamer] struct {
-	dialect DatabaseDialect
-	schema  *Schema[T]
+	commonBuilder[T]
 }
 
 func NewExecutor[T TableNamer](
 	dialect DatabaseDialect, schema *Schema[T],
 ) (*Executor[T], error) {
 	return &Executor[T]{
-		dialect: dialect,
-		schema:  schema,
+		commonBuilder: commonBuilder[T]{
+			dialect: dialect,
+			schema:  schema,
+		},
 	}, nil
 }
 
@@ -635,8 +636,4 @@ func (e *Executor[T]) buildDeleteQuery(buf *strings.Builder) ([]string, []fieldO
 
 	buf.WriteString(" WHERE ")
 	return primaryKeys, primaryOffsets
-}
-
-func (e *Executor[T]) quoteIdent(name string) string {
-	return quoteIdentWithDialect(e.dialect, name)
 }
