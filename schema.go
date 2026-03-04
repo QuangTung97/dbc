@@ -308,16 +308,20 @@ type ColumnGetter[T TableNamer] struct {
 	columns  []string
 }
 
-func (s *Schema[T]) GetColumnNames(fn func(g *ColumnGetter[T], table *T)) []string {
+type ColumnGetterFunc[T TableNamer] = func(g *ColumnGetter[T], table *T)
+
+func NewColumnGetter[T TableNamer](schema *Schema[T]) (*ColumnGetter[T], *T) {
 	var empty T
 	obj := &empty
-
-	getter := &ColumnGetter[T]{
-		schema:   s,
+	return &ColumnGetter[T]{
+		schema:   schema,
 		baseAddr: unsafe.Pointer(obj),
-	}
-	fn(getter, obj)
+	}, obj
+}
 
+func (s *Schema[T]) GetColumnNames(fn ColumnGetterFunc[T]) []string {
+	getter, obj := NewColumnGetter(s)
+	fn(getter, obj)
 	return getter.columns
 }
 

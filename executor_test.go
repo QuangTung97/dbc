@@ -752,6 +752,59 @@ func TestExecutor_Postgres__Update_Multi(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_Postgres__Insert_Or_Update_Multi__On_Non_ID(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecPostgres()
+
+	entity1 := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	// do update
+	err := exec.InsertOrUpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+			UpdateMultiColumnExpr(b, &table.Age, func(oldCol string, newCol string) string {
+				return oldCol + " + 1"
+			})
+		},
+		WithOnConflictColumns(func(g *ColumnGetter[tableTest03], table *tableTest03) {
+			ReturnColumn(g, &table.RoleID)
+			ReturnColumn(g, &table.Username)
+		}),
+	)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			`INSERT INTO "table_test03"`,
+			`("id", "role_id", "username", "age")`,
+			`VALUES`,
+			`(?, ?, ?, ?), (?, ?, ?, ?)`,
+			`ON CONFLICT ("role_id", "username") DO UPDATE SET`,
+			`"age" = "table_test03"."age" + 1`,
+		),
+		e.execQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity1.ID, entity1.RoleID, entity1.Username, entity1.Age,
+		entity2.ID, entity2.RoleID, entity2.Username, entity2.Age,
+	}, e.execArgs[0])
+}
+
 func TestExecutor_MySQL__Update_Cond(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL()

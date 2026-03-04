@@ -469,10 +469,29 @@ const (
 	upsertMultiPostgresExcluded = "EXCLUDED"
 )
 
+type upsertConfig struct {
+	conflictOnNonID   bool
+	onConflictColumns []string
+}
+
+type UpsertOption[T TableNamer] func(exec *Executor[T], conf *upsertConfig)
+
+func WithOnConflictColumns[T TableNamer](columnsFunc ColumnGetterFunc[T]) UpsertOption[T] {
+	return func(exec *Executor[T], conf *upsertConfig) {
+		getter, table := NewColumnGetter(exec.schema)
+		columnsFunc(getter, table)
+
+		conf.conflictOnNonID = true
+		conf.onConflictColumns = getter.columns
+	}
+}
+
+// InsertOrUpdateMulti does update by default
 func (e *Executor[T]) InsertOrUpdateMulti(
 	ctx context.Context,
 	entities []T,
 	updateFunc UpdateMultiBuilderFunc[T],
+	options ...UpsertOption[T],
 ) error {
 	var buf strings.Builder
 
@@ -506,6 +525,13 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 		fieldCount++
 	}
 
+	// setup config
+	conf := upsertConfig{}
+	for _, fn := range options {
+		fn(e, &conf)
+	}
+
+	// build value list
 	buf.WriteString(") VALUES ")
 	var args []any
 	for index := range entities {
@@ -518,12 +544,20 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 
 		entityVal := entities[index]
 		val := reflect.ValueOf(entityVal)
-		if err := e.validateUpdateEntity(val); err != nil {
-			return err
+
+		if conf.conflictOnNonID {
+			if err := e.validateInsertEntity(val); err != nil {
+				return err
+			}
+		} else {
+			if err := e.validateUpdateEntity(val); err != nil {
+				return err
+			}
 		}
 		args = append(args, e.getValuesOfEntity(offsetList, val)...)
 	}
 
+	// build update expr
 	if e.dialect == DialectMySQL {
 		buf.WriteString(" AS ")
 		buf.WriteString(upsertMultiNewValues)
@@ -533,7 +567,12 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 		buf.WriteString(" ON DUPLICATE KEY UPDATE ")
 	case DialectPostgres:
 		buf.WriteString(" ON CONFLICT (")
-		buf.WriteString(strings.Join(idColList, ", "))
+		if conf.conflictOnNonID {
+			colList := e.quoteIdentList(conf.onConflictColumns)
+			buf.WriteString(strings.Join(colList, ", "))
+		} else {
+			buf.WriteString(strings.Join(idColList, ", "))
+		}
 		buf.WriteString(") DO UPDATE SET ")
 	}
 
@@ -584,8 +623,6 @@ func (e *Executor[T]) UpdateCond(
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
 	return 0, err
 }
-
-// TODO add insert or update multi (for both MySQL and Postgres)
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 	var buf strings.Builder

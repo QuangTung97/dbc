@@ -97,6 +97,14 @@ func (c *commonBuilder[T]) quoteIdent(name string) string {
 	}
 }
 
+func (c *commonBuilder[T]) quoteIdentList(names []string) []string {
+	result := make([]string, 0, len(names))
+	for _, name := range names {
+		result = append(result, c.quoteIdent(name))
+	}
+	return result
+}
+
 func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
 	switch c.dialect {
 	case DialectMySQL:
