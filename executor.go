@@ -465,11 +465,11 @@ func (e *Executor[T]) Update(ctx context.Context, entity T) error {
 }
 
 const (
-	updateMultiNewValues        = "new_values"
-	updateMultiPostgresExcluded = "EXCLUDED"
+	upsertMultiNewValues        = "new_values"
+	upsertMultiPostgresExcluded = "EXCLUDED"
 )
 
-func (e *Executor[T]) UpdateMulti(
+func (e *Executor[T]) InsertOrUpdateMulti(
 	ctx context.Context,
 	entities []T,
 	updateFunc UpdateMultiBuilderFunc[T],
@@ -516,13 +516,17 @@ func (e *Executor[T]) UpdateMulti(
 		buf.WriteString(placeholderBuf.String())
 		buf.WriteString(")")
 
-		val := entities[index]
-		args = append(args, e.getValuesOfEntity(offsetList, reflect.ValueOf(val))...)
+		entityVal := entities[index]
+		val := reflect.ValueOf(entityVal)
+		if err := e.validateUpdateEntity(val); err != nil {
+			return err
+		}
+		args = append(args, e.getValuesOfEntity(offsetList, val)...)
 	}
 
 	if e.dialect == DialectMySQL {
 		buf.WriteString(" AS ")
-		buf.WriteString(updateMultiNewValues)
+		buf.WriteString(upsertMultiNewValues)
 	}
 	switch e.dialect {
 	case DialectMySQL, DialectMySQL5x:

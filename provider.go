@@ -12,6 +12,8 @@ import (
 	"github.com/QuangTung97/dbc/null"
 )
 
+// TODO add test helper provider
+
 type Provider interface {
 	Transact(ctx context.Context, fn func(ctx context.Context) error) error
 	Readonly(ctx context.Context) context.Context

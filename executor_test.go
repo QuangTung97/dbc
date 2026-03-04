@@ -562,7 +562,7 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 	}
 
 	// do update
-	err := exec.UpdateMulti(
+	err := exec.InsertOrUpdateMulti(
 		e.ctx, []tableTest03{entity1, entity2},
 		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
 			UpdateMultiAssign(b, &table.Username)
@@ -602,6 +602,42 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__Update_Multi__Entity_Missing_ID(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL()
+
+	entity1 := tableTest03{
+		ID:       0,
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		ID:       12,
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	// do update
+	err := exec.InsertOrUpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+			UpdateMultiAssign(b, &table.Username)
+			UpdateMultiColumnExpr(b, &table.Age, func(oldCol string, newCol string) string {
+				return oldCol + " + 1"
+			})
+			UpdateMultiColumnExpr(b, &table.RoleID, func(oldCol string, newCol string) string {
+				return newCol + " + 10"
+			})
+		},
+	)
+	assert.Equal(t, errors.New("field 'ID' of struct 'dbc.tableTest03' must not be zero"), err)
+
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL_5x__Update_Multi(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL5x()
@@ -620,7 +656,7 @@ func TestExecutor_MySQL_5x__Update_Multi(t *testing.T) {
 	}
 
 	// do update
-	err := exec.UpdateMulti(
+	err := exec.InsertOrUpdateMulti(
 		e.ctx, []tableTest03{entity1, entity2},
 		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
 			UpdateMultiAssign(b, &table.Username)
@@ -677,7 +713,7 @@ func TestExecutor_Postgres__Update_Multi(t *testing.T) {
 	}
 
 	// do update
-	err := exec.UpdateMulti(
+	err := exec.InsertOrUpdateMulti(
 		e.ctx, []tableTest03{entity1, entity2},
 		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
 			UpdateMultiAssign(b, &table.Username)

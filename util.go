@@ -100,11 +100,11 @@ func (c *commonBuilder[T]) quoteIdent(name string) string {
 func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
 	switch c.dialect {
 	case DialectMySQL:
-		return updateMultiNewValues + "." + col
+		return upsertMultiNewValues + "." + col
 	case DialectMySQL5x:
 		return "VALUES(" + col + ")"
 	case DialectPostgres:
-		return updateMultiPostgresExcluded + "." + col
+		return upsertMultiPostgresExcluded + "." + col
 	default:
 		return col
 	}
