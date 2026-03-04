@@ -6,7 +6,9 @@ var ctxKey = new(int)
 
 type contextValueType struct {
 	isReadonly bool
-	tx         Transaction
+	isTx       bool
+
+	tx Transaction
 
 	hookMap          map[*txHookKey]any
 	beforeCommitList []func(ctx context.Context) error

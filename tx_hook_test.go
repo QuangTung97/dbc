@@ -12,22 +12,25 @@ type hookStateTest struct {
 	list []string
 }
 
-func TestTxHook_Normal(t *testing.T) {
-	var actions []string
-
-	hook := NewTxHook[hookStateTest](
+func newTestHookWithInsertList(actions *[]string) *TxHook[hookStateTest] {
+	return NewTxHook[hookStateTest](
 		func() *hookStateTest {
-			actions = append(actions, "init")
+			*actions = append(*actions, "init")
 			return &hookStateTest{}
 		},
 		func(ctx context.Context, state *hookStateTest) error {
-			actions = append(actions, "before-commit:"+strings.Join(state.list, ","))
+			*actions = append(*actions, "before-commit:"+strings.Join(state.list, ","))
 			return nil
 		},
 		func(ctx context.Context, state *hookStateTest) {
-			actions = append(actions, "after-commit:"+strings.Join(state.list, ","))
+			*actions = append(*actions, "after-commit:"+strings.Join(state.list, ","))
 		},
 	)
+}
+
+func TestTxHook_Normal(t *testing.T) {
+	var actions []string
+	hook := newTestHookWithInsertList(&actions)
 
 	ctx := setToContext(
 		context.Background(),
