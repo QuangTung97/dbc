@@ -90,6 +90,11 @@ var tableTest05Schema = RegisterSchema(func(s *Schema[tableTest05], table *table
 	SchemaEditable(s, &table.Age)
 
 	SchemaIgnore(s, &table.CreatedAt)
+
+	SchemaUniqueKey(s, func(g *ColumnGetter[tableTest05], table *tableTest05) {
+		ReturnColumn(g, &table.RoleID)
+		ReturnColumn(g, &table.Username)
+	})
 })
 
 // ------------------------------

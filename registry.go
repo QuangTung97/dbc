@@ -13,6 +13,10 @@ type FieldTraverseInfo struct {
 	Type   reflect.Type
 }
 
+type UniqueKeyInfo struct {
+	Columns []string
+}
+
 type SchemaInterface interface {
 	GetTypeName() string
 	GetTypeString() string
@@ -20,6 +24,8 @@ type SchemaInterface interface {
 	GetTableName() string
 	GetPackagePath() string
 	TraverseFields() iter.Seq[FieldTraverseInfo]
+
+	GetUniqueKeys() []UniqueKeyInfo
 }
 
 var globalRegistryMut sync.Mutex

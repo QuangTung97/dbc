@@ -7,7 +7,6 @@ import (
 	"unsafe"
 )
 
-// TODO support adding unique key
 // TODO support adding index
 
 type Schema[T TableNamer] struct {
@@ -19,6 +18,8 @@ type Schema[T TableNamer] struct {
 	typeString        string
 	tableName         string
 	primaryKeyDefined bool
+
+	uniqueKeys []UniqueKeyInfo
 }
 
 func (s *Schema[T]) getFieldInfo(offset fieldOffsetType) fieldInfo {
