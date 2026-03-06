@@ -27,7 +27,7 @@ type fieldScanInfo struct {
 	fieldName string
 	dbName    string
 	indices   structFieldIndices
-	offset    uintptr
+	offset    fieldOffsetType
 	fieldType reflect.Type
 }
 
@@ -62,7 +62,7 @@ func traverseFieldsOfTypeRecursive(
 				fieldName: field.Name,
 				dbName:    field.Tag.Get(DBTag),
 				indices:   structFieldIndices(indices),
-				offset:    startOffset + field.Offset,
+				offset:    fieldOffsetType(startOffset + field.Offset),
 				fieldType: field.Type,
 			}
 			if !yield(info) {

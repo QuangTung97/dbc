@@ -8,9 +8,10 @@ import (
 )
 
 type FieldTraverseInfo struct {
-	Name   string
-	DBName string
-	Type   reflect.Type
+	Name      string
+	DBName    string
+	Type      reflect.Type
+	IsIgnored bool
 }
 
 type UniqueKeyInfo struct {

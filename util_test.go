@@ -19,7 +19,7 @@ func TestTraverseFieldsOfType(t *testing.T) {
 
 	var names []string
 	var indexList [][]int
-	var offsetList []uintptr
+	var offsetList []fieldOffsetType
 
 	for info := range traverseFieldsOfType(reflect.TypeOf(empty)) {
 		names = append(names, info.fieldName)
@@ -42,13 +42,13 @@ func TestTraverseFieldsOfType(t *testing.T) {
 		{2, 2, 1},
 	}, indexList)
 
-	assert.Equal(t, []uintptr{
+	assert.Equal(t, []fieldOffsetType{
 		0,
 		8,               // +int64
 		8 + 16,          // +null.Null[int64]
 		8 + 16 + 16,     // +string
 		8 + 16 + 16 + 8, // +int
-		8 + 16 + 16 + 8 + unsafe.Sizeof(time.Time{}), // +time.Time
+		8 + 16 + 16 + 8 + fieldOffsetType(unsafe.Sizeof(time.Time{})), // +time.Time
 	}, offsetList)
 }
 

@@ -73,9 +73,15 @@ func TestRegisterSchema_Normal(t *testing.T) {
 	assert.Equal(t, "ID", infoList[0].Name)
 	assert.Equal(t, "id", infoList[0].DBName)
 	assert.Equal(t, "int64", infoList[0].Type.String())
+	assert.Equal(t, false, infoList[0].IsIgnored)
 
 	assert.Equal(t, "RoleID", infoList[1].Name)
 	assert.Equal(t, "role_id", infoList[1].DBName)
+
+	assert.Equal(t, "UpdatedAt", infoList[5].Name)
+	assert.Equal(t, "updated_at", infoList[5].DBName)
+	assert.Equal(t, "time.Time", infoList[5].Type.String())
+	assert.Equal(t, true, infoList[5].IsIgnored)
 }
 
 func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {

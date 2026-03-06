@@ -365,10 +365,13 @@ func (s *Schema[T]) TraverseFields() iter.Seq[FieldTraverseInfo] {
 		var empty T
 		typ := reflect.TypeOf(empty)
 		traverseFieldsOfType(typ)(func(info fieldScanInfo) bool {
+			schemaFieldInfo := s.getFieldInfo(info.offset)
+
 			return yield(FieldTraverseInfo{
-				Name:   info.fieldName,
-				DBName: info.dbName,
-				Type:   info.fieldType,
+				Name:      info.fieldName,
+				DBName:    info.dbName,
+				Type:      info.fieldType,
+				IsIgnored: schemaFieldInfo.specType == fieldSpecIgnored,
 			})
 		})
 	}
