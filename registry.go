@@ -17,6 +17,11 @@ type UniqueKeyInfo struct {
 	Columns []string
 }
 
+type IndexInfo struct {
+	Name    string
+	Columns []string
+}
+
 type SchemaInterface interface {
 	GetTypeName() string
 	GetTypeString() string
@@ -26,6 +31,7 @@ type SchemaInterface interface {
 	TraverseFields() iter.Seq[FieldTraverseInfo]
 
 	GetUniqueKeys() []UniqueKeyInfo
+	GetIndexes() []IndexInfo
 }
 
 var globalRegistryMut sync.Mutex

@@ -95,6 +95,15 @@ var tableTest05Schema = RegisterSchema(func(s *Schema[tableTest05], table *table
 		ReturnColumn(g, &table.RoleID)
 		ReturnColumn(g, &table.Username)
 	})
+
+	SchemaIndex(
+		s,
+		"idx_table05_age_username",
+		func(g *ColumnGetter[tableTest05], table *tableTest05) {
+			ReturnColumn(g, &table.Age)
+			ReturnColumn(g, &table.Username)
+		},
+	)
 })
 
 // ------------------------------
