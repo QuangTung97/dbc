@@ -307,7 +307,9 @@ func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) 
 type ColumnGetter[T TableNamer] struct {
 	schema   *Schema[T]
 	baseAddr unsafe.Pointer
-	columns  []string
+
+	columns       []string
+	columnOffsets []fieldOffsetType
 }
 
 type ColumnGetterFunc[T TableNamer] = func(g *ColumnGetter[T], table *T)
@@ -331,6 +333,7 @@ func ReturnColumn[T TableNamer, F any](g *ColumnGetter[T], field *F) {
 	offset := unsafePointerSub(unsafe.Pointer(field), g.baseAddr)
 	colName := g.schema.getFieldInfo(offset).dbName
 	g.columns = append(g.columns, colName)
+	g.columnOffsets = append(g.columnOffsets, offset)
 }
 
 // ==========================================

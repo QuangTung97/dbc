@@ -45,6 +45,23 @@ func TestCondBuilder_IsNotNull(t *testing.T) {
 	assert.Equal(t, []any(nil), args)
 }
 
+func TestCondBuilder_Where_In__Single_Column(t *testing.T) {
+	c, _ := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
+
+	values := []tableTest05{
+		{Username: "user01"},
+		{Username: "user02"},
+		{Username: "user03"},
+	}
+	CondWhereIn(c, values, func(g *ColumnGetter[tableTest05], table *tableTest05) {
+		ReturnColumn(g, &table.Username)
+	})
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`username` IN (?, ?, ?)", whereCond)
+	assert.Equal(t, []any{"user01", "user02", "user03"}, args)
+}
+
 func TestCondBuilder_With_Limit(t *testing.T) {
 	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondEqual(c, &table.Username, "user01")

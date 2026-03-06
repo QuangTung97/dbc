@@ -34,18 +34,6 @@ func NewExecutor[T TableNamer](
 	}, nil
 }
 
-func (e *Executor[T]) getValuesOfEntity(
-	offsetList []fieldOffsetType, entityVal reflect.Value,
-) []any {
-	result := make([]any, 0, len(offsetList))
-	for _, offset := range offsetList {
-		indices := e.schema.fieldInfos[offset].indices
-		val := getValueOfStructFieldAt(entityVal, indices).Interface()
-		result = append(result, val)
-	}
-	return result
-}
-
 func (e *Executor[T]) GetByID(ctx context.Context, id T) (null.Null[T], error) {
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
@@ -74,7 +62,7 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
-	args := e.buildPrimaryEqualMatchMulti(&buf, primaryKeys, primaryOffsets, idList)
+	args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
 
 	// execute
 	tx := GetReadonly(ctx)
@@ -123,28 +111,6 @@ func (e *Executor[T]) buildPrimaryEqualMatchSingle(buf *strings.Builder, primary
 	}
 }
 
-func (e *Executor[T]) buildPrimaryEqualMatchMulti(
-	buf *strings.Builder, primaryKeys []string, primaryOffsets []fieldOffsetType, idList []T,
-) []any {
-	if len(primaryKeys) > 1 {
-		e.buildWhereInMultiCols(buf, primaryKeys)
-		buf.WriteString(" IN ")
-		e.buildPlaceholderTwoLevels(buf, len(primaryKeys), len(idList))
-	} else {
-		buf.WriteString(e.quoteIdent(primaryKeys[0]))
-		buf.WriteString(" IN ")
-		e.buildPlaceholderLen(buf, len(idList))
-	}
-
-	// build args
-	args := make([]any, 0, len(primaryOffsets)*len(idList))
-	for _, id := range idList {
-		idArgs := e.getValuesOfEntity(primaryOffsets, reflect.ValueOf(id))
-		args = append(args, idArgs...)
-	}
-	return args
-}
-
 func (e *Executor[T]) buildSelectQuery(
 	buf *strings.Builder, withWhere bool,
 ) ([]string, []fieldOffsetType) {
@@ -179,48 +145,6 @@ func (e *Executor[T]) buildSelectQuery(
 	}
 
 	return primaryKeys, primaryOffsets
-}
-
-func (e *Executor[T]) buildPlaceholderLen(buf *strings.Builder, size int) {
-	buf.WriteString("(")
-	for index := range size {
-		if index > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString("?")
-	}
-	buf.WriteString(")")
-}
-
-func (e *Executor[T]) buildPlaceholderTwoLevels(
-	buf *strings.Builder, numInner int, numOuter int,
-) {
-	buf.WriteString("(")
-	for y := range numOuter {
-		if y > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString("(")
-		for x := range numInner {
-			if x > 0 {
-				buf.WriteString(", ")
-			}
-			buf.WriteString("?")
-		}
-		buf.WriteString(")")
-	}
-	buf.WriteString(")")
-}
-
-func (e *Executor[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string) {
-	buf.WriteString("(")
-	for index, col := range cols {
-		if index > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString(e.quoteIdent(col))
-	}
-	buf.WriteString(")")
 }
 
 func (e *Executor[T]) buildInsertQuery(buf *strings.Builder) ([]fieldOffsetType, null.Null[fieldOffsetType]) {
@@ -641,7 +565,7 @@ func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
 	var buf strings.Builder
 	primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
-	args := e.buildPrimaryEqualMatchMulti(&buf, primaryKeys, primaryOffsets, idList)
+	args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)

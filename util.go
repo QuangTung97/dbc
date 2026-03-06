@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"strings"
 	"unsafe"
 )
 
@@ -127,4 +128,80 @@ func (c *commonBuilder[T]) computeUpdateMultiOldColumn(col string) string {
 	default:
 		return col
 	}
+}
+
+func (c *commonBuilder[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string) {
+	buf.WriteString("(")
+	for index, col := range cols {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(c.quoteIdent(col))
+	}
+	buf.WriteString(")")
+}
+
+func (*commonBuilder[T]) buildPlaceholderTwoLevels(
+	buf *strings.Builder, numInner int, numOuter int,
+) {
+	buf.WriteString("(")
+	for y := range numOuter {
+		if y > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString("(")
+		for x := range numInner {
+			if x > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString("?")
+		}
+		buf.WriteString(")")
+	}
+	buf.WriteString(")")
+}
+
+func (*commonBuilder[T]) buildPlaceholderLen(buf *strings.Builder, size int) {
+	buf.WriteString("(")
+	for index := range size {
+		if index > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString("?")
+	}
+	buf.WriteString(")")
+}
+
+func (c *commonBuilder[T]) buildColumnsWhereInCond(
+	buf *strings.Builder, columns []string, columnOffsets []fieldOffsetType, valueList []T,
+) []any {
+	if len(columns) > 1 {
+		c.buildWhereInMultiCols(buf, columns)
+		buf.WriteString(" IN ")
+		c.buildPlaceholderTwoLevels(buf, len(columns), len(valueList))
+	} else {
+		buf.WriteString(c.quoteIdent(columns[0]))
+		buf.WriteString(" IN ")
+		c.buildPlaceholderLen(buf, len(valueList))
+	}
+
+	// build args
+	args := make([]any, 0, len(columnOffsets)*len(valueList))
+	for _, id := range valueList {
+		idArgs := c.getValuesOfEntity(columnOffsets, reflect.ValueOf(id))
+		args = append(args, idArgs...)
+	}
+	return args
+}
+
+func (c *commonBuilder[T]) getValuesOfEntity(
+	offsetList []fieldOffsetType, entityVal reflect.Value,
+) []any {
+	result := make([]any, 0, len(offsetList))
+	for _, offset := range offsetList {
+		indices := c.schema.fieldInfos[offset].indices
+		val := getValueOfStructFieldAt(entityVal, indices).Interface()
+		result = append(result, val)
+	}
+	return result
 }

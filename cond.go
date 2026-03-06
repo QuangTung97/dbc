@@ -96,6 +96,19 @@ func CondIsNotNull[T TableNamer, F any](c *CondBuilder[T], field *null.Null[F]) 
 	})
 }
 
+func CondWhereIn[T TableNamer](c *CondBuilder[T], values []T, columnFunc ColumnGetterFunc[T]) {
+	getter, table := NewColumnGetter(c.common.schema)
+	columnFunc(getter, table)
+
+	// TODO panic if column list empty
+
+	var buf strings.Builder
+	args := c.common.buildColumnsWhereInCond(&buf, getter.columns, getter.columnOffsets, values)
+
+	c.condList = append(c.condList, buf.String())
+	c.args = append(c.args, args...)
+}
+
 func CondLimit[T TableNamer](c *CondBuilder[T], limit int) {
 	c.withLimit = null.New(limit)
 }
