@@ -49,7 +49,7 @@ func (s *fakeSchema) TraverseFields() iter.Seq[dbc.FieldTraverseInfo] {
 
 type matchEntry struct {
 	schemaType reflect.Type
-	dataType   string
+	dbType     string
 }
 
 type validatorTest struct {
@@ -78,7 +78,7 @@ func newValidatorTest() *validatorTest {
 
 			key := matchEntry{
 				schemaType: schemaType,
-				dataType:   dataType,
+				dbType:     dataType,
 			}
 			s.matchInputs = append(s.matchInputs, key)
 
@@ -153,6 +153,11 @@ func TestValidator_ValidateSchemas__Columns_Match(t *testing.T) {
 		},
 	}
 
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
 	err := s.val.ValidateSchemas(
 		context.Background(),
 		[]dbc.SchemaInterface{
@@ -163,4 +168,92 @@ func TestValidator_ValidateSchemas__Columns_Match(t *testing.T) {
 		},
 	)
 	assert.Equal(t, nil, err)
+
+	// check inputs
+	assert.Equal(t, []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}, s.matchInputs)
+}
+
+func TestValidator_ValidateSchemas__Columns_Missing_In_DB(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: false},
+			},
+		},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf("")),
+				newFieldInfo("age", reflect.TypeOf(int64(0))),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("not found column 'age' in table 'table01'"), err)
+}
+
+func TestValidator_ValidateSchemas__Columns_Missing_In_Schema(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: false},
+				{Name: "age", DataType: "int", Nullable: false},
+			},
+		},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf("")),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("not found column 'age' in schema 'table01_type'"), err)
+}
+
+func TestValidator_ValidateSchemas__Columns_Match__Mismatch_Type(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: false},
+				{Name: "age", DataType: "int", Nullable: false},
+			},
+		},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf("")),
+				newFieldInfo("age", reflect.TypeOf(int64(0))),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("column 'table01.age int' is incompatible with type 'int64'"), err)
 }

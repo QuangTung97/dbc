@@ -60,7 +60,6 @@ func (v *Validator) ValidateSchemas(
 		if err := v.validateSingleSchema(schema, dbTableMap[tableName]); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -94,7 +93,18 @@ func (v *Validator) validateSingleSchema(
 				col, table.Name,
 			)
 		}
+	}
 
+	for _, col := range fieldColList {
+		tableCol := tableColumnMap[col]
+		fieldInfo := schemaColumMap[col]
+		if !v.columnMatchFunc(fieldInfo.Type, tableCol.DataType) {
+			return fmt.Errorf(
+				"column '%s.%s %s' is incompatible with type '%s'",
+				table.Name, col, tableCol.DataType,
+				fieldInfo.Type.String(),
+			)
+		}
 	}
 
 	return nil
