@@ -16,6 +16,37 @@ func TestCondBuilder_Equal(t *testing.T) {
 	assert.Equal(t, []any{testRoleID(21)}, args)
 }
 
+func TestCondBuilder_Not_Equal(t *testing.T) {
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
+	CondNotEqual(c, &table.RoleID, testRoleID(21))
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`role_id` != ?", whereCond)
+	assert.Equal(t, []any{testRoleID(21)}, args)
+}
+
+func TestCondBuilder__Range_Query_Non_Equal(t *testing.T) {
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
+
+	CondGreater(c, &table.RoleID, testRoleID(21))
+	CondLess(c, &table.RoleID, testRoleID(28))
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`role_id` > ? AND `role_id` < ?", whereCond)
+	assert.Equal(t, []any{testRoleID(21), testRoleID(28)}, args)
+}
+
+func TestCondBuilder__Range_Query_With_Equal(t *testing.T) {
+	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
+
+	CondGreaterOrEqual(c, &table.RoleID, testRoleID(21))
+	CondLessOrEqual(c, &table.RoleID, testRoleID(28))
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "`role_id` >= ? AND `role_id` <= ?", whereCond)
+	assert.Equal(t, []any{testRoleID(21), testRoleID(28)}, args)
+}
+
 func TestCondBuilder_ColumnExpr(t *testing.T) {
 	c, table := NewCondBuilder[tableTest03](tableTest03Schema, DialectMySQL)
 	CondColumnExpr(c, &table.RoleID, func(col string) string {

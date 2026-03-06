@@ -66,7 +66,35 @@ func CondEqual[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
 	}, value)
 }
 
-// TODO add where in condition
+func CondNotEqual[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return col + " != ?"
+	}, value)
+}
+
+func CondGreater[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return col + " > ?"
+	}, value)
+}
+
+func CondGreaterOrEqual[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return col + " >= ?"
+	}, value)
+}
+
+func CondLess[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return col + " < ?"
+	}, value)
+}
+
+func CondLessOrEqual[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return col + " <= ?"
+	}, value)
+}
 
 func CondColumnExpr[T TableNamer, F any](
 	c *CondBuilder[T], field *F, fn func(col string) string, args ...any,
