@@ -26,6 +26,8 @@ type SchemaMigration struct {
 	IsDirty  bool   `db:"is_dirty"`
 }
 
+// TODO Add schema for schema_migration table
+
 func MigrateUp(
 	db *sqlx.DB, embedDir embed.FS, migrationDir string,
 	dbType DatabaseType,

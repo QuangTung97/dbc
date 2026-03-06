@@ -17,6 +17,8 @@ type Validator struct {
 	columnMatchFunc ColumnTypeMatchFunc
 }
 
+// TODO add custom table validate func
+
 func NewValidator(
 	loader TableLoader,
 	columnMatchFunc ColumnTypeMatchFunc,

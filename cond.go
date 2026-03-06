@@ -100,7 +100,9 @@ func CondWhereIn[T TableNamer](c *CondBuilder[T], values []T, columnFunc ColumnG
 	getter, table := NewColumnGetter(c.common.schema)
 	columnFunc(getter, table)
 
-	// TODO panic if column list empty
+	if len(getter.columns) == 0 {
+		panicFormat("where in column list must not be empty")
+	}
 
 	var buf strings.Builder
 	args := c.common.buildColumnsWhereInCond(&buf, getter.columns, getter.columnOffsets, values)

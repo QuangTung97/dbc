@@ -62,6 +62,36 @@ func TestCondBuilder_Where_In__Single_Column(t *testing.T) {
 	assert.Equal(t, []any{"user01", "user02", "user03"}, args)
 }
 
+func TestCondBuilder_Where_In__Multi_Cols(t *testing.T) {
+	c, _ := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
+
+	values := []tableTest05{
+		{Username: "user01", Age: 11},
+		{Username: "user02", Age: 12},
+	}
+	CondWhereIn(c, values, func(g *ColumnGetter[tableTest05], table *tableTest05) {
+		ReturnColumn(g, &table.Username)
+		ReturnColumn(g, &table.Age)
+	})
+
+	whereCond, args := c.GetWhereCond()
+	assert.Equal(t, "(`username`, `age`) IN ((?, ?), (?, ?))", whereCond)
+	assert.Equal(t, []any{"user01", 11, "user02", 12}, args)
+}
+
+func TestCondBuilder_Where_In__Empty_Panic(t *testing.T) {
+	c, _ := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
+
+	values := []tableTest05{
+		{Username: "user01"},
+		{Username: "user02"},
+	}
+	assert.PanicsWithValue(t, "where in column list must not be empty", func() {
+		CondWhereIn(c, values, func(g *ColumnGetter[tableTest05], table *tableTest05) {
+		})
+	})
+}
+
 func TestCondBuilder_With_Limit(t *testing.T) {
 	c, table := NewCondBuilder[tableTest05](tableTest05Schema, DialectMySQL)
 	CondEqual(c, &table.Username, "user01")
