@@ -110,15 +110,16 @@ type fieldInfo struct {
 	validatorList []func(val any) error
 }
 
-// TODO option to register schema without adding to global registry
-
 func RegisterSchema[T TableNamer](
 	definitionFn func(s *Schema[T], table *T),
+	options ...SchemaOption,
 ) *Schema[T] {
 	s := &Schema[T]{
 		def:        newSchemaDefinition[T](),
 		fieldInfos: map[fieldOffsetType]fieldInfo{},
 	}
+
+	conf := newSchemaConfig(options)
 
 	s.typeString = s.def.tableType.String()
 	s.tableName = (*s.def.table).TableName()
@@ -174,7 +175,11 @@ func RegisterSchema[T TableNamer](
 	}
 
 	s.def = nil
-	addToGlobalSchema(s)
+
+	// add to global registry
+	if !conf.withoutRegistering {
+		addToGlobalSchema(s)
+	}
 
 	return s
 }

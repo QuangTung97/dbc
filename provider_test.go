@@ -1,4 +1,4 @@
-package dbc
+package dbc_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 
+	. "github.com/QuangTung97/dbc"
 	"github.com/QuangTung97/dbc/dbmigrate"
 )
 
@@ -61,6 +62,10 @@ func getAuthUser(ctx context.Context, id int64) authUser {
 		panic(err)
 	}
 	return result.Data
+}
+
+type hookStateTest struct {
+	list []string
 }
 
 func newTestHook(actions *[]string) *TxHook[hookStateTest] {

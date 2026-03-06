@@ -14,7 +14,12 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/QuangTung97/dbc"
 	"github.com/QuangTung97/dbc/null"
+)
+
+const (
+	migrationID int64 = 1
 )
 
 // SchemaMigration is the migration table stored inside client's database.
@@ -26,7 +31,20 @@ type SchemaMigration struct {
 	IsDirty  bool   `db:"is_dirty"`
 }
 
-// TODO Add schema for schema_migration table
+func (s SchemaMigration) TableName() string {
+	return "schema_migration"
+}
+
+var SchemaMigrationSchema = dbc.RegisterSchema[SchemaMigration](
+	func(s *dbc.Schema[SchemaMigration], table *SchemaMigration) {
+		dbc.SchemaPrimaryKey(s, &table.ID)
+		dbc.SchemaEditable(s, &table.Version)
+		dbc.SchemaEditable(s, &table.Filename)
+		dbc.SchemaEditable(s, &table.IsDirty)
+
+		dbc.ValidateOptional(s, &table.IsDirty)
+	},
+)
 
 func MigrateUp(
 	db *sqlx.DB, embedDir embed.FS, migrationDir string,
@@ -37,17 +55,15 @@ func MigrateUp(
 		panic(err)
 	}
 
+	repo := newRepository(db, dbType)
+
 	err = doMigrateUp(
 		entries,
 		func() error {
 			return createTableFunc(db, dbType)
 		},
-		func() (null.Null[SchemaMigration], error) {
-			return getMigrationRow(db)
-		},
-		func(row SchemaMigration) error {
-			return upsertRowFunc(db, dbType, row)
-		},
+		repo.getRow,
+		repo.upsertRow,
 		func(filename string) error {
 			fullPath := filepath.Join(migrationDir, filename)
 			data, err := embedDir.ReadFile(fullPath)
@@ -109,7 +125,7 @@ func doMigrateUp(
 		slog.Info("Run migration script", slog.String("script", file.filename))
 
 		row := SchemaMigration{
-			ID:       1,
+			ID:       migrationID,
 			Version:  file.version,
 			Filename: file.filename,
 			IsDirty:  true,

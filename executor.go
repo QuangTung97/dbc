@@ -506,6 +506,8 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 	updateFunc(builder, updateTable)
 	buf.WriteString(builder.GetFullExpr())
 
+	// TODO handle empty update
+
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
 	return err

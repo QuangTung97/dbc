@@ -35,7 +35,9 @@ func TestMigrateUp__Integration(t *testing.T) {
 	assertTableExist(t, db, "auth_user")
 	assertTableExist(t, db, "product")
 
-	row, err := getMigrationRow(db)
+	repo := newRepository(db, DatabaseSQLite3)
+
+	row, err := repo.getRow()
 	assert.Equal(t, nil, err)
 	assert.Equal(t, null.New(SchemaMigration{
 		ID:       1,
