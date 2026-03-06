@@ -3,9 +3,12 @@ package mysqlcheck
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type Timestamp time.Time
 
 func TestDefaultMatchColumnType(t *testing.T) {
 	assert.Equal(t, true, DefaultMatchColumnType(reflect.TypeOf(""), "varchar"))
@@ -26,4 +29,11 @@ func TestDefaultMatchColumnType(t *testing.T) {
 
 	boolType := reflect.TypeOf(true)
 	assert.Equal(t, true, DefaultMatchColumnType(boolType, "boolean"))
+
+	timeType := reflect.TypeOf(time.Time{})
+	assert.Equal(t, true, DefaultMatchColumnType(timeType, "timestamp"))
+
+	tsType := reflect.TypeOf(Timestamp{})
+	assert.Equal(t, true, DefaultMatchColumnType(tsType, "timestamp"))
+	assert.Equal(t, false, DefaultMatchColumnType(tsType, "varchar"))
 }

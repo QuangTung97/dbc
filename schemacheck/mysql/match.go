@@ -2,6 +2,7 @@ package mysqlcheck
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/QuangTung97/dbc/schemacheck"
 )
@@ -29,7 +30,22 @@ func DefaultMatchColumnType(schemaType reflect.Type, dataType string) bool {
 		return dataType == "boolean"
 	}
 
+	if schemaType.Kind() == reflect.Struct {
+		var empty time.Time
+		if schemaType.ConvertibleTo(reflect.TypeOf(empty)) {
+			return allowTimeType(dataType)
+		}
+	}
+
 	return false
 }
 
 var _ schemacheck.ColumnTypeMatchFunc = DefaultMatchColumnType
+
+func allowTimeType(dataType string) bool {
+	switch dataType {
+	case "timestamp", "datetime":
+		return true
+	}
+	return false
+}
