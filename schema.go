@@ -110,6 +110,8 @@ type fieldInfo struct {
 	validatorList []func(val any) error
 }
 
+// TODO option to register schema without adding to global registry
+
 func RegisterSchema[T TableNamer](
 	definitionFn func(s *Schema[T], table *T),
 ) *Schema[T] {

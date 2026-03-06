@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/QuangTung97/dbc"
 	"github.com/QuangTung97/dbc/null"
@@ -101,6 +102,13 @@ func (v *Validator) validateSingleSchema(
 		fieldInfo := schemaColumMap[col]
 
 		fieldType := fieldInfo.Type
+		if fieldType.Kind() == reflect.Ptr {
+			return fmt.Errorf(
+				"invalid type '%s' of column '%s.%s'",
+				fieldType.String(), table.Name, col,
+			)
+		}
+
 		innerType, ok := null.IsReflectNullType(fieldType)
 		if ok {
 			fieldType = innerType
@@ -109,6 +117,7 @@ func (v *Validator) validateSingleSchema(
 			}
 		}
 
+		tableCol.DataType = strings.ToLower(tableCol.DataType)
 		if !v.columnMatchFunc(fieldType, tableCol.DataType) {
 			return fmt.Errorf(
 				"column '%s.%s %s' is incompatible with type '%s'",
