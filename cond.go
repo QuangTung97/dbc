@@ -61,12 +61,22 @@ func (c *CondBuilder[T]) IsEmpty() bool {
 // --------------------------------------------------------------------------------------
 
 func CondEqual[T TableNamer, F any](c *CondBuilder[T], field *F, value F) {
-	CondColumnExpr(c, field, func(col string) string {
+	condColumnUnsafeExpr(c, field, func(col string) string {
 		return col + " = ?"
 	}, value)
 }
 
+// TODO add where in condition
+
 func CondColumnExpr[T TableNamer, F any](
+	c *CondBuilder[T], field *F, fn func(col string) string, args ...any,
+) {
+	condColumnUnsafeExpr(c, field, func(col string) string {
+		return "(" + fn(col) + ")"
+	}, args...)
+}
+
+func condColumnUnsafeExpr[T TableNamer, F any](
 	c *CondBuilder[T], field *F, fn func(col string) string, args ...any,
 ) {
 	dbName := c.common.getColumnName(unsafe.Pointer(field))
@@ -75,13 +85,13 @@ func CondColumnExpr[T TableNamer, F any](
 }
 
 func CondIsNull[T TableNamer, F any](c *CondBuilder[T], field *null.Null[F]) {
-	CondColumnExpr(c, field, func(col string) string {
+	condColumnUnsafeExpr(c, field, func(col string) string {
 		return col + " IS NULL"
 	})
 }
 
 func CondIsNotNull[T TableNamer, F any](c *CondBuilder[T], field *null.Null[F]) {
-	CondColumnExpr(c, field, func(col string) string {
+	condColumnUnsafeExpr(c, field, func(col string) string {
 		return col + " IS NOT NULL"
 	})
 }

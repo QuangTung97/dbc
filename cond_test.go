@@ -23,7 +23,7 @@ func TestCondBuilder_ColumnExpr(t *testing.T) {
 	}, "hello")
 
 	whereCond, args := c.GetWhereCond()
-	assert.Equal(t, "LOWER(`role_id`) = ?", whereCond)
+	assert.Equal(t, "(LOWER(`role_id`) = ?)", whereCond)
 	assert.Equal(t, []any{"hello"}, args)
 }
 
