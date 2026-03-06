@@ -21,6 +21,8 @@ type Executor[T TableNamer] struct {
 	commonBuilder[T]
 }
 
+// TODO support executor with ignored field
+
 func NewExecutor[T TableNamer](
 	dialect DatabaseDialect, schema *Schema[T],
 ) (*Executor[T], error) {
