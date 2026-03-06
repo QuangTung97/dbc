@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/QuangTung97/dbc"
+	"github.com/QuangTung97/dbc/null"
 )
 
 type fakeSchema struct {
@@ -61,7 +62,7 @@ type validatorTest struct {
 	matchInputs []matchEntry
 }
 
-func (v *validatorTest) LoadAll(ctx context.Context) ([]TableInfo, error) {
+func (v *validatorTest) LoadAll(_ context.Context) ([]TableInfo, error) {
 	return v.infos, nil
 }
 
@@ -256,4 +257,71 @@ func TestValidator_ValidateSchemas__Columns_Match__Mismatch_Type(t *testing.T) {
 		},
 	)
 	assert.Equal(t, errors.New("column 'table01.age int' is incompatible with type 'int64'"), err)
+}
+
+func TestValidator_ValidateSchemas__Columns_Match__Null_String(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: true},
+			},
+		},
+	}
+
+	// string to varchar
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	var empty null.Null[string]
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf(empty)),
+			),
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// check inputs
+	assert.Equal(t, []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}, s.matchInputs)
+}
+
+func TestValidator_ValidateSchemas__Columns_Match__Null_String__DB_Non_Nullable__Error(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: false}, // non nullable
+			},
+		},
+	}
+
+	// string to varchar
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	var empty null.Null[string]
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf(empty)),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("column 'table01.username' must be nullable"), err)
 }

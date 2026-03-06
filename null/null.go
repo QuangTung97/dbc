@@ -259,7 +259,7 @@ type CheckNullOutput struct {
 	DataField  reflect.Value
 }
 
-func IsValidReflectNullType(typ reflect.Type) (reflect.Type, bool) {
+func IsReflectNullType(typ reflect.Type) (reflect.Type, bool) {
 	if typ.Kind() != reflect.Struct {
 		return nil, false
 	}
@@ -284,9 +284,9 @@ func IsValidReflectNullType(typ reflect.Type) (reflect.Type, bool) {
 	return secondField.Type, true
 }
 
-func IsNullType(val reflect.Value) (CheckNullOutput, bool) {
+func IsReflectNullValue(val reflect.Value) (CheckNullOutput, bool) {
 	valType := val.Type()
-	if _, ok := IsValidReflectNullType(valType); !ok {
+	if _, ok := IsReflectNullType(valType); !ok {
 		return CheckNullOutput{}, false
 	}
 

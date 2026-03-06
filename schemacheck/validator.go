@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/QuangTung97/dbc"
+	"github.com/QuangTung97/dbc/null"
 )
 
 type ColumnTypeMatchFunc func(schemaType reflect.Type, dataType string) bool
@@ -98,7 +99,17 @@ func (v *Validator) validateSingleSchema(
 	for _, col := range fieldColList {
 		tableCol := tableColumnMap[col]
 		fieldInfo := schemaColumMap[col]
-		if !v.columnMatchFunc(fieldInfo.Type, tableCol.DataType) {
+
+		fieldType := fieldInfo.Type
+		innerType, ok := null.IsReflectNullType(fieldType)
+		if ok {
+			fieldType = innerType
+			if !tableCol.Nullable {
+				return fmt.Errorf("column '%s.%s' must be nullable", table.Name, col)
+			}
+		}
+
+		if !v.columnMatchFunc(fieldType, tableCol.DataType) {
 			return fmt.Errorf(
 				"column '%s.%s %s' is incompatible with type '%s'",
 				table.Name, col, tableCol.DataType,

@@ -62,7 +62,7 @@ func TestIsNullType(t *testing.T) {
 	t.Run("valid, non null", func(t *testing.T) {
 		x := New("hello")
 
-		output, ok := IsNullType(reflect.ValueOf(x))
+		output, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, true, ok)
 		assert.Equal(t, true, output.NonNull)
 
@@ -75,7 +75,7 @@ func TestIsNullType(t *testing.T) {
 
 	t.Run("valid and null", func(t *testing.T) {
 		var x Null[string]
-		output, ok := IsNullType(reflect.ValueOf(x))
+		output, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, true, ok)
 		assert.Equal(t, false, output.NonNull)
 
@@ -88,7 +88,7 @@ func TestIsNullType(t *testing.T) {
 
 	t.Run("not a struct", func(t *testing.T) {
 		x := "invalid"
-		_, ok := IsNullType(reflect.ValueOf(x))
+		_, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, false, ok)
 	})
 
@@ -97,7 +97,7 @@ func TestIsNullType(t *testing.T) {
 			Valid bool
 		}
 		var x invalidStruct
-		_, ok := IsNullType(reflect.ValueOf(x))
+		_, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, false, ok)
 	})
 
@@ -107,7 +107,7 @@ func TestIsNullType(t *testing.T) {
 			Data  string
 		}
 		var x invalidStruct
-		_, ok := IsNullType(reflect.ValueOf(x))
+		_, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, false, ok)
 	})
 
@@ -117,7 +117,7 @@ func TestIsNullType(t *testing.T) {
 			Data   string
 		}
 		var x invalidStruct
-		_, ok := IsNullType(reflect.ValueOf(x))
+		_, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, false, ok)
 	})
 
@@ -127,7 +127,7 @@ func TestIsNullType(t *testing.T) {
 			Data1 string
 		}
 		var x invalidStruct
-		_, ok := IsNullType(reflect.ValueOf(x))
+		_, ok := IsReflectNullValue(reflect.ValueOf(x))
 		assert.Equal(t, false, ok)
 	})
 }
