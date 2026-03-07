@@ -17,8 +17,9 @@ import (
 type fakeSchema struct {
 	dbc.SchemaInterface
 
-	tableName string
-	fields    []dbc.FieldTraverseInfo
+	tableName  string
+	fields     []dbc.FieldTraverseInfo
+	uniqueKeys []dbc.UniqueKeyInfo
 }
 
 func newFakeSchema(tableName string, fields ...dbc.FieldTraverseInfo) *fakeSchema {
@@ -46,6 +47,10 @@ func (s *fakeSchema) GetTypeString() string {
 
 func (s *fakeSchema) TraverseFields() iter.Seq[dbc.FieldTraverseInfo] {
 	return slices.Values(s.fields)
+}
+
+func (s *fakeSchema) GetUniqueKeys() []dbc.UniqueKeyInfo {
+	return s.uniqueKeys
 }
 
 type matchEntry struct {
@@ -396,4 +401,141 @@ func TestValidator_ValidateSchemas__Custom_Validator(t *testing.T) {
 	assert.Equal(t, []matchEntry{
 		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
 	}, s.matchInputs)
+}
+
+func TestValidator_ValidateSchemas__Unique_Key_Missing_In_DB(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateUniqueKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.uniqueKeys = []dbc.UniqueKeyInfo{
+		{Columns: []string{"role_id", "age"}},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, errors.New("not found unique key (role_id, age) in table 'table01'"), err)
+}
+
+func TestValidator_ValidateSchemas__Unique_Key_Missing_In_Schema(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateUniqueKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			UniqueKeys: []UniqueKeyInfo{
+				{Columns: []string{"age", "role_id"}},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, errors.New("not found unique key (age, role_id) in schema 'table01_type'"), err)
+}
+
+func TestValidator_ValidateSchemas__Unique_Key__Success(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateUniqueKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			UniqueKeys: []UniqueKeyInfo{
+				{Columns: []string{"age", "role_id"}},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.uniqueKeys = []dbc.UniqueKeyInfo{
+		{Columns: []string{"age", "role_id"}},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, nil, err)
+}
+
+func TestValidator_ValidateSchemas__Unique_Key_Missing_In_Schema__Not_Enabled(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			UniqueKeys: []UniqueKeyInfo{
+				{Columns: []string{"age", "role_id"}},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, nil, err)
 }

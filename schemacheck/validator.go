@@ -130,5 +130,43 @@ func (v *Validator) validateSingleSchema(
 		}
 	}
 
+	if v.conf.enableValidateUniqueKey {
+		if err := v.validateUniqueKeys(schema, table); err != nil {
+			return err
+		}
+	}
+
 	return v.conf.tableValidateFunc(schema, table)
+}
+
+func (v *Validator) validateUniqueKeys(schema dbc.SchemaInterface, table TableInfo) error {
+	schemaSet := map[string]struct{}{}
+	for _, info := range schema.GetUniqueKeys() {
+		key := strings.Join(info.Columns, "|")
+		schemaSet[key] = struct{}{}
+	}
+
+	tableSet := map[string]struct{}{}
+	for _, info := range table.UniqueKeys {
+		key := strings.Join(info.Columns, "|")
+		tableSet[key] = struct{}{}
+		if _, ok := schemaSet[key]; !ok {
+			return fmt.Errorf(
+				"not found unique key (%s) in schema '%s'",
+				strings.Join(info.Columns, ", "), schema.GetTypeString(),
+			)
+		}
+	}
+
+	for _, info := range schema.GetUniqueKeys() {
+		key := strings.Join(info.Columns, "|")
+		if _, ok := tableSet[key]; !ok {
+			return fmt.Errorf(
+				"not found unique key (%s) in table '%s'",
+				strings.Join(info.Columns, ", "), table.Name,
+			)
+		}
+	}
+
+	return nil
 }
