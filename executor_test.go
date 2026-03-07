@@ -118,6 +118,10 @@ func (r *fakeResult) LastInsertId() (int64, error) {
 	return r.insertID, nil
 }
 
+func (r *fakeResult) RowsAffected() (int64, error) {
+	return 90, nil
+}
+
 func (e *executorTest) ExecContext(
 	_ context.Context, query string, args ...any,
 ) (sql.Result, error) {

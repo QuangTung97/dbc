@@ -91,3 +91,47 @@ func TestInsertAuthUser__Then_Get(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, []AuthUser{user2, user1}, users)
 }
+
+func TestInsertAuthUser__Then_Update(t *testing.T) {
+	tc := newTestCase(t)
+	exec := tc.userExec
+
+	// insert multi
+	user1 := AuthUser{Username: "user01", Age: 21}
+	user2 := AuthUser{Username: "user02", Age: 22}
+	user3 := AuthUser{Username: "user03", Age: 23}
+	err := exec.InsertMulti(tc.ctx, []*AuthUser{&user1, &user2, &user3})
+	assert.Equal(t, nil, err)
+
+	// update user2
+	user2.Age += 10
+	err = exec.Update(tc.ctx, user2)
+	assert.Equal(t, nil, err)
+
+	// select all
+	users, err := exec.SelectCond(tc.ctx, func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+	})
+	assert.Equal(t, nil, err)
+	assert.Equal(t, []AuthUser{user1, user2, user3}, users)
+
+	// update by cond
+	affected, err := exec.UpdateCond(
+		tc.ctx,
+		func(b *dbc.UpdateBuilder[AuthUser], table *AuthUser) {
+			dbc.UpdateAssign(b, &table.Age, 40)
+		},
+		func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+			dbc.CondLess(cond, &table.ID, user3.ID)
+		},
+	)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, int64(2), affected)
+
+	// select all again
+	users, err = exec.SelectCond(tc.ctx, func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+	})
+	assert.Equal(t, nil, err)
+	user1.Age = 40
+	user2.Age = 40
+	assert.Equal(t, []AuthUser{user1, user2, user3}, users)
+}

@@ -546,8 +546,11 @@ func (e *Executor[T]) UpdateCond(
 	args = append(args, condArgs...)
 
 	tx := GetTx(ctx)
-	_, err := tx.ExecContext(ctx, buf.String(), args...)
-	return 0, err
+	result, err := tx.ExecContext(ctx, buf.String(), args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
