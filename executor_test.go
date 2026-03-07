@@ -602,6 +602,34 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 	}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__Update_Multi__Empty_Update_Block(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL()
+
+	entity1 := tableTest03{
+		ID:       11,
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		ID:       12,
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+
+	// do update
+	err := exec.InsertOrUpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+		},
+	)
+	assert.Equal(t, errors.New("update block must not be empty"), err)
+	// check query
+	assert.Equal(t, 0, len(e.execQueries))
+}
+
 func TestExecutor_MySQL__Update_Multi__Entity_Missing_ID(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL()

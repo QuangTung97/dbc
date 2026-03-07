@@ -2,6 +2,7 @@ package dbc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -498,7 +499,9 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 	updateFunc(builder, updateTable)
 	buf.WriteString(builder.GetFullExpr())
 
-	// TODO handle empty update
+	if len(builder.exprList) == 0 {
+		return errors.New("update block must not be empty")
+	}
 
 	tx := GetTx(ctx)
 	_, err := tx.ExecContext(ctx, buf.String(), args...)
