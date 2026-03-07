@@ -28,7 +28,7 @@ func TestDefaultMatchColumnType(t *testing.T) {
 	assert.Equal(t, true, DefaultMatchColumnType(intType, "bigint"))
 
 	boolType := reflect.TypeOf(true)
-	assert.Equal(t, true, DefaultMatchColumnType(boolType, "boolean"))
+	assert.Equal(t, true, DefaultMatchColumnType(boolType, "tinyint"))
 
 	timeType := reflect.TypeOf(time.Time{})
 	assert.Equal(t, true, DefaultMatchColumnType(timeType, "timestamp"))

@@ -27,7 +27,7 @@ func DefaultMatchColumnType(schemaType reflect.Type, dataType string) bool {
 	}
 
 	if schemaType.Kind() == reflect.Bool {
-		return dataType == "boolean"
+		return dataType == "tinyint"
 	}
 
 	if schemaType.Kind() == reflect.Struct {

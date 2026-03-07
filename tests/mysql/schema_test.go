@@ -20,8 +20,22 @@ import (
 //go:embed migrations/*
 var migrationsDir embed.FS
 
-type testCase struct {
-	db *sqlx.DB
+func getAllSchemas() []dbc.SchemaInterface {
+	currentPkg := getCurrentPackage()
+	var result []dbc.SchemaInterface
+	for _, schema := range dbc.GetAllSchemas() {
+		if schema.GetPackagePath() != currentPkg {
+			continue
+		}
+		result = append(result, schema)
+	}
+	return result
+}
+
+func getAllSchemasIncludeMigration() []dbc.SchemaInterface {
+	result := getAllSchemas()
+	result = append(result, dbmigrate.SchemaMigrationSchema) // add migration schema
+	return result
 }
 
 var getNewDB = sync.OnceValue(func() *sqlx.DB {
@@ -29,15 +43,27 @@ var getNewDB = sync.OnceValue(func() *sqlx.DB {
 		"mysql",
 		"root:pass@tcp(localhost:3306)/testdb?parseTime=true&multiStatements=true",
 	)
+
+	for _, schema := range getAllSchemasIncludeMigration() {
+		db.MustExec(`DROP TABLE IF EXISTS ` + schema.GetTableName())
+	}
+
 	dbmigrate.MigrateUp(db, migrationsDir, "migrations", dbc.DialectMySQL)
 	return db
 })
+
+type testCase struct {
+	db *sqlx.DB
+}
 
 func newTestCase(_ *testing.T) *testCase {
 	tc := &testCase{}
 	tc.db = getNewDB()
 
-	// TODO drop all tables
+	// truncate all normal table
+	for _, schema := range getAllSchemas() {
+		tc.db.MustExec(`TRUNCATE TABLE ` + schema.GetTableName())
+	}
 
 	return tc
 }
@@ -46,21 +72,11 @@ func TestValidateSchemas(t *testing.T) {
 	tc := newTestCase(t)
 
 	val := schemacheck.NewValidator(
-		mysqlcheck.NewLoader(tc.db),
+		mysqlcheck.NewLoader(tc.db, "testdb"),
 		mysqlcheck.DefaultMatchColumnType,
+		schemacheck.WithValidateUniqueKey(true),
 	)
 
-	currentPkg := getCurrentPackage()
-
-	var schemaList []dbc.SchemaInterface
-	for _, schema := range dbc.GetAllSchemas() {
-		if schema.GetPackagePath() != currentPkg {
-			continue
-		}
-		schemaList = append(schemaList, schema)
-	}
-	schemaList = append(schemaList, dbmigrate.SchemaMigrationSchema) // add migration schema
-
-	err := val.ValidateSchemas(context.Background(), schemaList)
+	err := val.ValidateSchemas(context.Background(), getAllSchemasIncludeMigration())
 	assert.Equal(t, nil, err)
 }
