@@ -1,5 +1,7 @@
 package dbc
 
+import "strings"
+
 type DatabaseDialect int
 
 const (
@@ -28,6 +30,11 @@ func (d DatabaseDialect) withOnConflictSyntax() bool {
 }
 
 func (c *commonBuilder[T]) quoteIdent(name string) string {
+	dotIndex := strings.Index(name, ".")
+	if dotIndex >= 0 {
+		return c.quoteIdent(name[:dotIndex]) + "." + c.quoteIdent(name[dotIndex+1:])
+	}
+
 	switch c.dialect {
 	case DialectMySQL, DialectMySQL5x:
 		return "`" + name + "`"

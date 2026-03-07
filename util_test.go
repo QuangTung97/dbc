@@ -76,3 +76,16 @@ func TestTraverseFieldsOfType__Exit_Early(t *testing.T) {
 		{2, 0},
 	}, indexList)
 }
+
+func TestCommonBuilder_quoteIdent(t *testing.T) {
+	var empty tableTest03
+	table := &empty
+	b := commonBuilder[tableTest03]{
+		basePtr: unsafe.Pointer(table),
+		schema:  tableTest03Schema,
+		dialect: DialectMySQL,
+	}
+
+	assert.Equal(t, "`username`", b.quoteIdent("username"))
+	assert.Equal(t, "`information_schema`.`columns`", b.quoteIdent("information_schema.columns"))
+}
