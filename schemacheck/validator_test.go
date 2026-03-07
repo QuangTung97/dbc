@@ -66,7 +66,7 @@ func (v *validatorTest) LoadAll(_ context.Context) ([]TableInfo, error) {
 	return v.infos, nil
 }
 
-func newValidatorTest() *validatorTest {
+func newValidatorTest(options ...ValidatorOption) *validatorTest {
 	s := &validatorTest{}
 	s.val = NewValidator(
 		s,
@@ -86,6 +86,7 @@ func newValidatorTest() *validatorTest {
 			_, ok := set[key]
 			return ok
 		},
+		options...,
 	)
 	return s
 }
@@ -354,4 +355,45 @@ func TestValidator_ValidateSchemas__Pointer_Column__Error(t *testing.T) {
 		},
 	)
 	assert.Equal(t, errors.New("invalid type '*string' of column 'table01.username'"), err)
+}
+
+func TestValidator_ValidateSchemas__Custom_Validator(t *testing.T) {
+	var actions []string
+	s := newValidatorTest(
+		WithCustomTableValidateFunc(func(schema dbc.SchemaInterface, table TableInfo) error {
+			actions = append(actions, "validate-fn")
+			return errors.New("test validate err")
+		}),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+		},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf("")),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("test validate err"), err)
+	assert.Equal(t, []string{"validate-fn"}, actions)
+
+	// check inputs
+	assert.Equal(t, []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}, s.matchInputs)
 }

@@ -13,17 +13,18 @@ import (
 type ColumnTypeMatchFunc func(schemaType reflect.Type, dataType string) bool
 
 type Validator struct {
+	conf            validatorConfig
 	loader          TableLoader
 	columnMatchFunc ColumnTypeMatchFunc
 }
 
-// TODO add custom table validate func
-
 func NewValidator(
 	loader TableLoader,
 	columnMatchFunc ColumnTypeMatchFunc,
+	options ...ValidatorOption,
 ) *Validator {
 	return &Validator{
+		conf:            newValidatorConfig(options),
 		loader:          loader,
 		columnMatchFunc: columnMatchFunc,
 	}
@@ -129,5 +130,5 @@ func (v *Validator) validateSingleSchema(
 		}
 	}
 
-	return nil
+	return v.conf.tableValidateFunc(schema, table)
 }
