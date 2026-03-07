@@ -54,7 +54,7 @@ func (c *CondBuilder[T]) GetWhereCond() (string, []any) {
 	return buf.String(), args
 }
 
-func (c *CondBuilder[T]) IsEmpty() bool {
+func (c *CondBuilder[T]) IsEmptyWhere() bool {
 	return len(c.condList) == 0
 }
 

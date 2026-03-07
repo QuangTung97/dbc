@@ -53,17 +53,26 @@ var getNewDB = sync.OnceValue(func() *sqlx.DB {
 })
 
 type testCase struct {
-	db *sqlx.DB
+	db  *sqlx.DB
+	ctx context.Context
+
+	userExec *dbc.Executor[AuthUser]
 }
 
 func newTestCase(_ *testing.T) *testCase {
 	tc := &testCase{}
 	tc.db = getNewDB()
 
+	provider := dbc.NewProvider(tc.db)
+	tc.ctx = provider.Autocommit(context.Background())
+
 	// truncate all normal table
 	for _, schema := range getAllSchemas() {
 		tc.db.MustExec(`TRUNCATE TABLE ` + schema.GetTableName())
 	}
+
+	// init executors
+	tc.userExec, _ = dbc.NewExecutor(dbc.DialectMySQL, AuthUserSchema)
 
 	return tc
 }

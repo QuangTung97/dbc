@@ -67,14 +67,17 @@ func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
 func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) ([]any, bool) {
 	builder, table := NewCondBuilder[T](e.schema, e.dialect)
 	cond(builder, table)
-	if builder.IsEmpty() {
-		return nil, true
+
+	isEmpty := false
+	if builder.IsEmptyWhere() {
+		isEmpty = true
+	} else {
+		buf.WriteString(" WHERE ")
 	}
 
 	whereCond, args := builder.GetWhereCond()
-	buf.WriteString(" WHERE ")
 	buf.WriteString(whereCond)
-	return args, false
+	return args, isEmpty
 }
 
 func (e *Executor[T]) GetCond(ctx context.Context, cond CondBuilderFunc[T]) (null.Null[T], error) {
