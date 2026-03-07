@@ -28,4 +28,8 @@ var AuthUserSchema = dbc.RegisterSchema(func(s *dbc.Schema[AuthUser], table *Aut
 
 	dbc.SchemaIgnore(s, &table.CreatedAt)
 	dbc.SchemaIgnore(s, &table.UpdatedAt)
+
+	dbc.SchemaUniqueKey(s, func(g *dbc.ColumnGetter[AuthUser], table *AuthUser) {
+		dbc.ReturnColumn(g, &table.Username)
+	})
 })

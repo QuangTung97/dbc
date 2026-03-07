@@ -33,6 +33,8 @@ type SchemaInterface interface {
 
 	GetUniqueKeys() []UniqueKeyInfo
 	GetIndexes() []IndexInfo
+
+	// TODO get primary columns
 }
 
 var globalRegistryMut sync.Mutex

@@ -2,6 +2,7 @@ package mysqlcheck
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 
@@ -33,8 +34,41 @@ var InformationColumnSchema = dbc.RegisterSchema(
 	dbc.WithSchemaNoRegistering(),
 )
 
+// -----------------------------------------------------------------------------------
+
+type InformationStat struct {
+	TableSchema string `db:"TABLE_SCHEMA"`
+	Table       string `db:"TABLE_NAME"`
+	IndexName   string `db:"INDEX_NAME"`
+	ColumnName  string `db:"COLUMN_NAME"`
+
+	NonUnique int `db:"NON_UNIQUE"`
+	Seq       int `db:"SEQ_IN_INDEX"`
+}
+
+func (InformationStat) TableName() string {
+	return "INFORMATION_SCHEMA.STATISTICS"
+}
+
+var InformationStatSchema = dbc.RegisterSchema(func(s *dbc.Schema[InformationStat], table *InformationStat) {
+	dbc.SchemaPrimaryKey(s, &table.TableSchema)
+	dbc.SchemaPrimaryKey(s, &table.Table)
+	dbc.SchemaPrimaryKey(s, &table.IndexName)
+	dbc.SchemaPrimaryKey(s, &table.ColumnName)
+
+	dbc.SchemaConst(s, &table.NonUnique)
+	dbc.SchemaConst(s, &table.Seq)
+})
+
+// -----------------------------------------------------------------------------------
+
 func NewLoader(db *sqlx.DB, databaseName string) schemacheck.TableLoader {
 	exec, err := dbc.NewExecutor(dbc.DialectMySQL, InformationColumnSchema)
+	if err != nil {
+		panic(err)
+	}
+
+	statExec, err := dbc.NewExecutor(dbc.DialectMySQL, InformationStatSchema)
 	if err != nil {
 		panic(err)
 	}
@@ -42,6 +76,7 @@ func NewLoader(db *sqlx.DB, databaseName string) schemacheck.TableLoader {
 	return &mysqlLoader{
 		provider:     dbc.NewProvider(db),
 		exec:         exec,
+		statExec:     statExec,
 		databaseName: databaseName,
 	}
 }
@@ -49,6 +84,7 @@ func NewLoader(db *sqlx.DB, databaseName string) schemacheck.TableLoader {
 type mysqlLoader struct {
 	provider     dbc.Provider
 	exec         *dbc.Executor[InformationColumn]
+	statExec     *dbc.Executor[InformationStat]
 	databaseName string
 }
 
@@ -94,6 +130,14 @@ func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, err
 			Columns: columns,
 		})
 	}
+
+	allStats, err := s.statExec.SelectCond(ctx, func(b *dbc.CondBuilder[InformationStat], table *InformationStat) {
+		dbc.CondEqual(b, &table.TableSchema, s.databaseName)
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("ALL STATS", allStats)
 
 	return result, nil
 }
