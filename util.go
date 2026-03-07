@@ -8,35 +8,6 @@ import (
 	"unsafe"
 )
 
-type DatabaseDialect int
-
-const (
-	DialectMySQL DatabaseDialect = iota + 1
-	DialectMySQL5x
-	DialectPostgres
-	DialectSQLite3
-)
-
-func (d DatabaseDialect) withReturningSyntax() bool {
-	switch d {
-	case DialectPostgres, DialectSQLite3:
-		return true
-	default:
-		return false
-	}
-}
-
-func (d DatabaseDialect) withOnConflictSyntax() bool {
-	switch d {
-	case DialectPostgres, DialectSQLite3:
-		return true
-	default:
-		return false
-	}
-}
-
-// --------------------------------------------------------------------------------------
-
 func panicFormat(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
@@ -116,47 +87,12 @@ func (c *commonBuilder[T]) getColumnName(fieldPtr unsafe.Pointer) string {
 	return c.quoteIdent(c.schema.getFieldInfo(offset).dbName)
 }
 
-func (c *commonBuilder[T]) quoteIdent(name string) string {
-	switch c.dialect {
-	case DialectMySQL, DialectMySQL5x:
-		return "`" + name + "`"
-	case DialectPostgres, DialectSQLite3:
-		return `"` + name + `"`
-	default:
-		return name
-	}
-}
-
 func (c *commonBuilder[T]) quoteIdentList(names []string) []string {
 	result := make([]string, 0, len(names))
 	for _, name := range names {
 		result = append(result, c.quoteIdent(name))
 	}
 	return result
-}
-
-func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
-	switch c.dialect {
-	case DialectMySQL:
-		return upsertMultiNewValues + "." + col
-	case DialectMySQL5x:
-		return "VALUES(" + col + ")"
-	case DialectPostgres, DialectSQLite3:
-		return upsertMultiPostgresExcluded + "." + col
-	default:
-		return col
-	}
-}
-
-func (c *commonBuilder[T]) computeUpdateMultiOldColumn(col string) string {
-	switch c.dialect {
-	case DialectMySQL, DialectMySQL5x:
-		return col
-	case DialectPostgres, DialectSQLite3:
-		return c.quoteIdent(c.schema.tableName) + "." + col
-	default:
-		return col
-	}
 }
 
 func (c *commonBuilder[T]) buildWhereInMultiCols(buf *strings.Builder, cols []string) {
