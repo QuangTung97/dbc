@@ -14,8 +14,8 @@ type repository struct {
 	exec     *dbc.Executor[SchemaMigration]
 }
 
-func newRepository(db *sqlx.DB, dbType DatabaseType) *repository {
-	exec, err := dbc.NewExecutor(dbType.ToDialect(), SchemaMigrationSchema)
+func newRepository(db *sqlx.DB, dialect dbc.DatabaseDialect) *repository {
+	exec, err := dbc.NewExecutor(dialect, SchemaMigrationSchema)
 	if err != nil {
 		panic(err)
 	}

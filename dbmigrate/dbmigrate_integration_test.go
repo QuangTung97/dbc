@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/QuangTung97/dbc"
 	"github.com/QuangTung97/dbc/null"
 )
 
@@ -30,12 +31,12 @@ var migrate01Dir embed.FS
 func TestMigrateUp__Integration(t *testing.T) {
 	db := newTestDB(t)
 
-	MigrateUp(db, migrate01Dir, "testdata/migrate01", DatabaseSQLite3)
+	MigrateUp(db, migrate01Dir, "testdata/migrate01", dbc.DialectSQLite3)
 
 	assertTableExist(t, db, "auth_user")
 	assertTableExist(t, db, "product")
 
-	repo := newRepository(db, DatabaseSQLite3)
+	repo := newRepository(db, dbc.DialectSQLite3)
 
 	row, err := repo.getRow()
 	assert.Equal(t, nil, err)
@@ -47,7 +48,7 @@ func TestMigrateUp__Integration(t *testing.T) {
 	}), row)
 
 	// migrate up again
-	MigrateUp(db, migrate01Dir, "testdata/migrate01", DatabaseSQLite3)
+	MigrateUp(db, migrate01Dir, "testdata/migrate01", dbc.DialectSQLite3)
 }
 
 func assertTableExist(t *testing.T, db *sqlx.DB, table string) {

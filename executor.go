@@ -9,14 +9,6 @@ import (
 	"github.com/QuangTung97/dbc/null"
 )
 
-type DatabaseDialect int
-
-const (
-	DialectMySQL DatabaseDialect = iota + 1
-	DialectMySQL5x
-	DialectPostgres
-)
-
 type Executor[T TableNamer] struct {
 	commonBuilder[T]
 }
@@ -298,7 +290,7 @@ func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
 
 	// execute insert
 	tx := GetTx(ctx)
-	if e.dialect == DialectPostgres && autoIncField.Valid {
+	if e.dialect.withReturningSyntax() && autoIncField.Valid {
 		idOffset := autoIncField.Data
 		buf.WriteString(" RETURNING ")
 		buf.WriteString(e.schema.fieldInfos[idOffset].dbName)
@@ -488,10 +480,8 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 		buf.WriteString(" AS ")
 		buf.WriteString(upsertMultiNewValues)
 	}
-	switch e.dialect {
-	case DialectMySQL, DialectMySQL5x:
-		buf.WriteString(" ON DUPLICATE KEY UPDATE ")
-	case DialectPostgres:
+
+	if e.dialect.withOnConflictSyntax() {
 		buf.WriteString(" ON CONFLICT (")
 		if conf.conflictOnNonID {
 			colList := e.quoteIdentList(conf.onConflictColumns)
@@ -500,6 +490,8 @@ func (e *Executor[T]) InsertOrUpdateMulti(
 			buf.WriteString(strings.Join(idColList, ", "))
 		}
 		buf.WriteString(") DO UPDATE SET ")
+	} else {
+		buf.WriteString(" ON DUPLICATE KEY UPDATE ")
 	}
 
 	builder, updateTable := NewUpdateMultiBuilder(e.schema, e.dialect)

@@ -27,7 +27,7 @@ func newTestDB(t *testing.T) *sqlx.DB {
 		_ = db.Close()
 	})
 
-	dbmigrate.MigrateUp(db, migrateDir, "testdata/migrate", dbmigrate.DatabaseSQLite3)
+	dbmigrate.MigrateUp(db, migrateDir, "testdata/migrate", DialectSQLite3)
 
 	return db
 }

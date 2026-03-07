@@ -48,19 +48,19 @@ var SchemaMigrationSchema = dbc.RegisterSchema[SchemaMigration](
 
 func MigrateUp(
 	db *sqlx.DB, embedDir embed.FS, migrationDir string,
-	dbType DatabaseType,
+	dialect dbc.DatabaseDialect,
 ) {
 	entries, err := embedDir.ReadDir(migrationDir)
 	if err != nil {
 		panic(err)
 	}
 
-	repo := newRepository(db, dbType)
+	repo := newRepository(db, dialect)
 
 	err = doMigrateUp(
 		entries,
 		func() error {
-			return createTableFunc(db, dbType)
+			return createTableFunc(db, dialect)
 		},
 		repo.getRow,
 		repo.upsertRow,

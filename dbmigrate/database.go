@@ -8,25 +8,7 @@ import (
 	"github.com/QuangTung97/dbc"
 )
 
-type DatabaseType int
-
-const (
-	DatabaseSQLite3 DatabaseType = iota + 1
-	DatabaseMySQL
-)
-
-func (dt DatabaseType) ToDialect() dbc.DatabaseDialect {
-	switch dt {
-	case DatabaseMySQL:
-		return dbc.DialectMySQL
-	case DatabaseSQLite3:
-		return dbc.DialectPostgres
-	default:
-		return -1
-	}
-}
-
-const SQLiteCreateTableQuery = `
+const sqlite3CreateTableQuery = `
 CREATE TABLE IF NOT EXISTS schema_migration (
     id INTEGER NOT NULL PRIMARY KEY,
     version INTEGER NOT NULL,
@@ -35,7 +17,7 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 ) STRICT;
 `
 
-const MySQLCreateTableQuery = `
+const mysqlAndPostgresCreateTableQuery = `
 CREATE TABLE IF NOT EXISTS schema_migration (
 	id INTEGER NOT NULL PRIMARY KEY,
     version INTEGER NOT NULL,
@@ -44,15 +26,15 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 );
 `
 
-func createTableFunc(db *sqlx.DB, dbType DatabaseType) error {
+func createTableFunc(db *sqlx.DB, dialect dbc.DatabaseDialect) error {
 	var query string
-	switch dbType {
-	case DatabaseSQLite3:
-		query = SQLiteCreateTableQuery
-	case DatabaseMySQL:
-		query = MySQLCreateTableQuery
+	switch dialect {
+	case dbc.DialectSQLite3:
+		query = sqlite3CreateTableQuery
+	case dbc.DialectMySQL, dbc.DialectMySQL5x, dbc.DialectPostgres:
+		query = mysqlAndPostgresCreateTableQuery
 	default:
-		return fmt.Errorf("unsupported database type: %v", dbType)
+		return fmt.Errorf("unsupported database dialect: %v", dialect)
 	}
 
 	_, err := db.Exec(query)
