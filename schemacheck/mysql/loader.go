@@ -1,6 +1,13 @@
 package mysqlcheck
 
-import "github.com/QuangTung97/dbc"
+import (
+	"context"
+
+	"github.com/jmoiron/sqlx"
+
+	"github.com/QuangTung97/dbc"
+	"github.com/QuangTung97/dbc/schemacheck"
+)
 
 type InformationColumn struct {
 	TableSchema string `db:"table_schema"`
@@ -25,3 +32,24 @@ var InformationColumnSchema = dbc.RegisterSchema(
 	},
 	dbc.WithSchemaNoRegistering(),
 )
+
+func NewLoader(db *sqlx.DB) schemacheck.TableLoader {
+	exec, err := dbc.NewExecutor(dbc.DialectMySQL, InformationColumnSchema)
+	if err != nil {
+		panic(err)
+	}
+
+	return &mysqlLoader{
+		provider: dbc.NewProvider(db),
+		exec:     exec,
+	}
+}
+
+type mysqlLoader struct {
+	provider dbc.Provider
+	exec     *dbc.Executor[InformationColumn]
+}
+
+func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, error) {
+	return nil, nil
+}
