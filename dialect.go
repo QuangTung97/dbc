@@ -61,7 +61,7 @@ func (c *commonBuilder[T]) computeUpdateMultiNewColumn(col string) string {
 func (c *commonBuilder[T]) computeUpdateMultiOldColumn(col string) string {
 	switch c.dialect {
 	case DialectMySQL, DialectMySQL5x:
-		return col
+		return c.quoteIdent(c.schema.tableName) + "." + col
 	case DialectPostgres, DialectSQLite3:
 		return c.quoteIdent(c.schema.tableName) + "." + col
 	default:

@@ -45,6 +45,8 @@ var AuthUserSchema = dbc.RegisterSchema(func(s *dbc.Schema[AuthUser], table *Aut
 	})
 })
 
+// ---------------------------------------------------------------------------
+
 func GetAllSchemas() []dbc.SchemaInterface {
 	currentPkg := getCurrentPackage()
 	var result []dbc.SchemaInterface
@@ -68,6 +70,8 @@ type simpleType int
 func getCurrentPackage() string {
 	return reflect.TypeOf(simpleType(0)).PkgPath()
 }
+
+// ---------------------------------------------------------------------------
 
 var globalOnce sync.Once
 var globalDB *sqlx.DB

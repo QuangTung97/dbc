@@ -141,3 +141,44 @@ func RunTestInsertAuthUserThenUpdate(t *testing.T, conf TestConfig) {
 	user2.Age = 40
 	assert.Equal(t, []AuthUser{user1, user2, user3}, users)
 }
+
+func RunTestInsertAuthUserThenUpdateMulti(t *testing.T, conf TestConfig) {
+	tc := NewTestCase(t, conf)
+	exec := tc.UserExec
+
+	// insert multi
+	user1 := AuthUser{Username: "user01", Age: 21}
+	user2 := AuthUser{Username: "user02", Age: 22}
+	user3 := AuthUser{Username: "user03", Age: 23}
+	err := exec.InsertMulti(tc.Ctx, []*AuthUser{&user1, &user2, &user3})
+	assert.Equal(t, nil, err)
+
+	// update multi
+	user1.Username = "user11"
+	user2.Username = "user12"
+	user3.Username = "user13"
+	err = exec.InsertOrUpdateMulti(
+		tc.Ctx,
+		[]AuthUser{user1, user2, user3},
+		func(b *dbc.UpdateMultiBuilder[AuthUser], table *AuthUser) {
+			dbc.UpdateMultiAssign(b, &table.Username)
+			dbc.UpdateMultiColumnExpr(b, &table.Age, func(oldCol string, newCol string) string {
+				return oldCol + " + 5"
+			})
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// select all
+	users, err := exec.SelectCond(tc.Ctx, func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+		dbc.CondOrderBy(cond, func(b *dbc.OrderByBuilder[AuthUser]) {
+			dbc.OrderByAsc(b, &table.ID)
+		})
+	})
+	assert.Equal(t, nil, err)
+
+	user1.Age += 5
+	user2.Age += 5
+	user3.Age += 5
+	assert.Equal(t, []AuthUser{user1, user2, user3}, users)
+}
