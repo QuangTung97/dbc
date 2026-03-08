@@ -370,6 +370,17 @@ func (s *Schema[T]) GetPackagePath() string {
 	return typ.PkgPath()
 }
 
+func (s *Schema[T]) GetPrimaryKeys() []string {
+	var result []string
+	for _, offset := range s.allFields {
+		info := s.getFieldInfo(offset)
+		if info.isPrimaryKey {
+			result = append(result, info.dbName)
+		}
+	}
+	return result
+}
+
 func (s *Schema[T]) TraverseFields() iter.Seq[FieldTraverseInfo] {
 	return func(yield func(FieldTraverseInfo) bool) {
 		var empty T

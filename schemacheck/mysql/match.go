@@ -7,8 +7,6 @@ import (
 	"github.com/QuangTung97/dbc/schemacheck"
 )
 
-// TODO add loader
-
 func DefaultMatchColumnType(schemaType reflect.Type, dataType string) bool {
 	if schemaType.Kind() == reflect.String {
 		switch dataType {

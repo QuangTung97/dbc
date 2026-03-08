@@ -24,8 +24,9 @@ type IndexInfo struct {
 }
 
 type TableInfo struct {
-	Name       string
-	Columns    []ColumnInfo
-	UniqueKeys []UniqueKeyInfo
-	Indexes    []IndexInfo // TODO validate index list
+	Name        string
+	Columns     []ColumnInfo
+	PrimaryKeys []string // TODO handle
+	UniqueKeys  []UniqueKeyInfo
+	Indexes     []IndexInfo // TODO validate index list
 }

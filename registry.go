@@ -31,10 +31,9 @@ type SchemaInterface interface {
 	GetPackagePath() string
 	TraverseFields() iter.Seq[FieldTraverseInfo]
 
+	GetPrimaryKeys() []string
 	GetUniqueKeys() []UniqueKeyInfo
 	GetIndexes() []IndexInfo
-
-	// TODO get primary columns
 }
 
 var globalRegistryMut sync.Mutex

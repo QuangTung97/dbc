@@ -1,8 +1,9 @@
 package mysqlcheck
 
 import (
+	"cmp"
 	"context"
-	"fmt"
+	"slices"
 
 	"github.com/jmoiron/sqlx"
 
@@ -44,6 +45,11 @@ type InformationStat struct {
 
 	NonUnique int `db:"NON_UNIQUE"`
 	Seq       int `db:"SEQ_IN_INDEX"`
+}
+
+type schemaIndexKey struct {
+	Table     string
+	IndexName string
 }
 
 func (InformationStat) TableName() string {
@@ -90,6 +96,20 @@ type mysqlLoader struct {
 
 func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, error) {
 	ctx = s.provider.Readonly(ctx)
+
+	result, err := s.loadTableColumnsInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.loadIndexInfos(ctx, result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *mysqlLoader) loadTableColumnsInfo(ctx context.Context) ([]schemacheck.TableInfo, error) {
 	columnList, err := s.exec.SelectCond(ctx, func(b *dbc.CondBuilder[InformationColumn], table *InformationColumn) {
 		dbc.CondEqual(b, &table.TableSchema, s.databaseName)
 	})
@@ -131,13 +151,59 @@ func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, err
 		})
 	}
 
+	return result, nil
+}
+
+func (s *mysqlLoader) loadIndexInfos(ctx context.Context, result []schemacheck.TableInfo) error {
 	allStats, err := s.statExec.SelectCond(ctx, func(b *dbc.CondBuilder[InformationStat], table *InformationStat) {
 		dbc.CondEqual(b, &table.TableSchema, s.databaseName)
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
-	fmt.Println("ALL STATS", allStats)
 
-	return result, nil
+	statMap := map[schemaIndexKey][]InformationStat{}
+	var indexKeys []schemaIndexKey
+	for _, stat := range allStats {
+		key := schemaIndexKey{
+			Table:     stat.Table,
+			IndexName: stat.IndexName,
+		}
+		prev := statMap[key]
+		if len(prev) == 0 {
+			indexKeys = append(indexKeys, key)
+		}
+		statMap[key] = append(prev, stat)
+	}
+
+	tableMap := map[string]*schemacheck.TableInfo{}
+	for i := range result {
+		table := &result[i]
+		tableMap[table.Name] = table
+	}
+
+	const primaryIndexName = "PRIMARY"
+	for _, key := range indexKeys {
+		stats := statMap[key]
+		slices.SortFunc(stats, func(a, b InformationStat) int {
+			return cmp.Compare(a.Seq, b.Seq)
+		})
+
+		if key.IndexName == primaryIndexName {
+			continue
+		}
+
+		columns := make([]string, 0, len(stats))
+		for _, stat := range stats {
+			columns = append(columns, stat.ColumnName)
+		}
+
+		uniqueKey := schemacheck.UniqueKeyInfo{
+			Columns: columns,
+		}
+		table := tableMap[key.Table]
+		table.UniqueKeys = append(table.UniqueKeys, uniqueKey)
+	}
+
+	return nil
 }

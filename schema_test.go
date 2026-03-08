@@ -63,6 +63,7 @@ func TestRegisterSchema_Normal(t *testing.T) {
 	assert.Equal(t, "dbc.tableTest03", schema.GetReflectType().String())
 	assert.Equal(t, "table_test03", schema.GetTableName())
 	assert.Equal(t, "github.com/QuangTung97/dbc", schema.GetPackagePath())
+	assert.Equal(t, []string{"id"}, schema.GetPrimaryKeys())
 
 	var infoList []FieldTraverseInfo
 	for info := range schema.TraverseFields() {
@@ -102,7 +103,7 @@ func TestRegisterSchema_Missing_Col_Spec(t *testing.T) {
 
 func TestRegisterSchema_Composite_Primary_Key__Normal(t *testing.T) {
 	newTestSchema(t)
-	RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
+	schema := RegisterSchema(func(s *Schema[tableTest04], table *tableTest04) {
 		SchemaPrimaryKey(s, &table.RoleID)
 		SchemaPrimaryKey(s, &table.Username)
 
@@ -111,6 +112,8 @@ func TestRegisterSchema_Composite_Primary_Key__Normal(t *testing.T) {
 
 		SchemaIgnore(s, &table.CreatedAt)
 	})
+
+	assert.Equal(t, []string{"role_id", "username"}, schema.GetPrimaryKeys())
 }
 
 func TestRegisterSchema_Duplicated_Definition(t *testing.T) {
