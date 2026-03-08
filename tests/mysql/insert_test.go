@@ -110,6 +110,9 @@ func TestInsertAuthUser__Then_Update(t *testing.T) {
 
 	// select all
 	users, err := exec.SelectCond(tc.ctx, func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+		dbc.CondOrderBy(cond, func(b *dbc.OrderByBuilder[AuthUser]) {
+			dbc.OrderByAsc(b, &table.ID)
+		})
 	})
 	assert.Equal(t, nil, err)
 	assert.Equal(t, []AuthUser{user1, user2, user3}, users)
@@ -129,6 +132,9 @@ func TestInsertAuthUser__Then_Update(t *testing.T) {
 
 	// select all again
 	users, err = exec.SelectCond(tc.ctx, func(cond *dbc.CondBuilder[AuthUser], table *AuthUser) {
+		dbc.CondOrderBy(cond, func(b *dbc.OrderByBuilder[AuthUser]) {
+			dbc.OrderByAsc(b, &table.ID)
+		})
 	})
 	assert.Equal(t, nil, err)
 	user1.Age = 40

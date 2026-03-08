@@ -6,7 +6,8 @@ type validatorConfig struct {
 	tableValidateFunc func(schema dbc.SchemaInterface, table TableInfo) error
 
 	enableValidatePrimaryKey bool
-	enableValidateUniqueKey  bool
+	enableValidateUniqueKeys bool
+	enableValidateIndexes    bool
 }
 
 func newValidatorConfig(options []ValidatorOption) validatorConfig {
@@ -34,8 +35,14 @@ func WithValidatePrimaryKey(enabled bool) ValidatorOption {
 	}
 }
 
-func WithValidateUniqueKey(enabled bool) ValidatorOption {
+func WithValidateUniqueKeys(enabled bool) ValidatorOption {
 	return func(conf *validatorConfig) {
-		conf.enableValidateUniqueKey = enabled
+		conf.enableValidateUniqueKeys = enabled
+	}
+}
+
+func WithValidateIndexes(enabled bool) ValidatorOption {
+	return func(conf *validatorConfig) {
+		conf.enableValidateIndexes = enabled
 	}
 }

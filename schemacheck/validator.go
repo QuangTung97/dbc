@@ -142,8 +142,14 @@ func (v *Validator) validateSingleSchema(
 		}
 	}
 
-	if v.conf.enableValidateUniqueKey {
+	if v.conf.enableValidateUniqueKeys {
 		if err := v.validateUniqueKeys(schema, table); err != nil {
+			return err
+		}
+	}
+
+	if v.conf.enableValidateIndexes {
+		if err := v.validateIndexes(schema, table); err != nil {
 			return err
 		}
 	}
@@ -176,6 +182,54 @@ func (v *Validator) validateUniqueKeys(schema dbc.SchemaInterface, table TableIn
 			return fmt.Errorf(
 				"not found unique key (%s) in table '%s'",
 				strings.Join(info.Columns, ", "), table.Name,
+			)
+		}
+	}
+
+	return nil
+}
+
+func (v *Validator) validateIndexes(schema dbc.SchemaInterface, table TableInfo) error {
+	type indexColumns struct {
+		cols []string
+	}
+
+	schemaIndexMap := map[string]indexColumns{}
+	for _, info := range schema.GetIndexes() {
+		schemaIndexMap[info.Name] = indexColumns{
+			cols: info.Columns,
+		}
+	}
+
+	tableIndexMap := map[string]indexColumns{}
+	for _, info := range table.Indexes {
+		tableIndexMap[info.Name] = indexColumns{
+			cols: info.Columns,
+		}
+
+		_, ok := schemaIndexMap[info.Name]
+		if !ok {
+			return fmt.Errorf(
+				"missing index '%s' in schema '%s'",
+				info.Name, schema.GetTypeString(),
+			)
+		}
+	}
+
+	for _, info := range schema.GetIndexes() {
+		tableCols, ok := tableIndexMap[info.Name]
+		if !ok {
+			return fmt.Errorf(
+				"missing index '%s' in table '%s'",
+				info.Name, table.Name,
+			)
+		}
+
+		schemaCols := schemaIndexMap[info.Name]
+		if !slices.Equal(schemaCols.cols, tableCols.cols) {
+			return fmt.Errorf(
+				"mismatch column list of index '%s' in table '%s'",
+				info.Name, table.Name,
 			)
 		}
 	}

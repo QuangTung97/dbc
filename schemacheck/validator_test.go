@@ -21,6 +21,7 @@ type fakeSchema struct {
 	fields      []dbc.FieldTraverseInfo
 	primaryKeys []string
 	uniqueKeys  []dbc.UniqueKeyInfo
+	indexes     []dbc.IndexInfo
 }
 
 func newFakeSchema(tableName string, fields ...dbc.FieldTraverseInfo) *fakeSchema {
@@ -56,6 +57,10 @@ func (s *fakeSchema) GetPrimaryKeys() []string {
 
 func (s *fakeSchema) GetUniqueKeys() []dbc.UniqueKeyInfo {
 	return s.uniqueKeys
+}
+
+func (s *fakeSchema) GetIndexes() []dbc.IndexInfo {
+	return s.indexes
 }
 
 type matchEntry struct {
@@ -410,7 +415,7 @@ func TestValidator_ValidateSchemas__Custom_Validator(t *testing.T) {
 
 func TestValidator_ValidateSchemas__Unique_Key_Missing_In_DB(t *testing.T) {
 	s := newValidatorTest(
-		WithValidateUniqueKey(true),
+		WithValidateUniqueKeys(true),
 	)
 
 	s.infos = []TableInfo{
@@ -444,7 +449,7 @@ func TestValidator_ValidateSchemas__Unique_Key_Missing_In_DB(t *testing.T) {
 
 func TestValidator_ValidateSchemas__Unique_Key_Missing_In_Schema(t *testing.T) {
 	s := newValidatorTest(
-		WithValidateUniqueKey(true),
+		WithValidateUniqueKeys(true),
 	)
 
 	s.infos = []TableInfo{
@@ -478,7 +483,7 @@ func TestValidator_ValidateSchemas__Unique_Key_Missing_In_Schema(t *testing.T) {
 
 func TestValidator_ValidateSchemas__Unique_Key__Success(t *testing.T) {
 	s := newValidatorTest(
-		WithValidateUniqueKey(true),
+		WithValidateUniqueKeys(true),
 	)
 
 	s.infos = []TableInfo{
@@ -667,6 +672,178 @@ func TestValidator_ValidateSchemas__Primary_Key_Missing_In_Schema__Not_Enabled(t
 		"table01",
 		newFieldInfo("username", reflect.TypeOf("")),
 	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, nil, err)
+}
+
+func TestValidator_ValidateSchemas__Index_Missing_In_DB(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateIndexes(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.indexes = []dbc.IndexInfo{
+		{
+			Name:    "idx_test_01",
+			Columns: []string{"role_id", "age"},
+		},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(
+		t,
+		errors.New("missing index 'idx_test_01' in table 'table01'"),
+		err,
+	)
+}
+
+func TestValidator_ValidateSchemas__Index_Missing_In_Schema(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateIndexes(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			Indexes: []IndexInfo{
+				{
+					Name:    "idx_test_01",
+					Columns: []string{"role_id", "age"},
+				},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(
+		t,
+		errors.New("missing index 'idx_test_01' in schema 'table01_type'"),
+		err,
+	)
+}
+
+func TestValidator_ValidateSchemas__Index_Mismatch_Columns(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateIndexes(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			Indexes: []IndexInfo{
+				{
+					Name:    "idx_test_01",
+					Columns: []string{"role_id", "age"},
+				},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.indexes = []dbc.IndexInfo{
+		{
+			Name:    "idx_test_01",
+			Columns: []string{"role_id"},
+		},
+	}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(
+		t,
+		errors.New("mismatch column list of index 'idx_test_01' in table 'table01'"),
+		err,
+	)
+}
+
+func TestValidator_ValidateSchemas__Index_Match(t *testing.T) {
+	s := newValidatorTest(
+		WithValidateIndexes(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			Indexes: []IndexInfo{
+				{
+					Name:    "idx_test_01",
+					Columns: []string{"role_id", "age"},
+				},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.indexes = []dbc.IndexInfo{
+		{
+			Name:    "idx_test_01",
+			Columns: []string{"role_id", "age"},
+		},
+	}
 
 	s.matchList = []matchEntry{
 		{schemaType: reflect.TypeOf(""), dbType: "varchar"},

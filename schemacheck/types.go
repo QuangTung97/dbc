@@ -28,5 +28,5 @@ type TableInfo struct {
 	Columns     []ColumnInfo
 	PrimaryKeys []string
 	UniqueKeys  []UniqueKeyInfo
-	Indexes     []IndexInfo // TODO validate index list
+	Indexes     []IndexInfo
 }

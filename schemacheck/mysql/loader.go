@@ -190,17 +190,27 @@ func (s *mysqlLoader) loadIndexInfos(ctx context.Context, result []schemacheck.T
 		})
 
 		columns := make([]string, 0, len(stats))
+		isUnique := true
 		for _, stat := range stats {
 			columns = append(columns, stat.ColumnName)
+			if stat.NonUnique != 0 {
+				isUnique = false
+			}
 		}
 
 		table := tableMap[key.Table]
 
 		if key.IndexName == primaryIndexName {
 			table.PrimaryKeys = columns
-		} else {
+		} else if isUnique {
 			uniqueKey := schemacheck.UniqueKeyInfo{Columns: columns}
 			table.UniqueKeys = append(table.UniqueKeys, uniqueKey)
+		} else {
+			index := schemacheck.IndexInfo{
+				Name:    key.IndexName,
+				Columns: columns,
+			}
+			table.Indexes = append(table.Indexes, index)
 		}
 	}
 

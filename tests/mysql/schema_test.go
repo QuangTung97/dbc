@@ -84,7 +84,8 @@ func TestValidateSchemas(t *testing.T) {
 		mysqlcheck.NewLoader(tc.db, "testdb"),
 		mysqlcheck.DefaultMatchColumnType,
 		schemacheck.WithValidatePrimaryKey(true),
-		schemacheck.WithValidateUniqueKey(true),
+		schemacheck.WithValidateUniqueKeys(true),
+		schemacheck.WithValidateIndexes(true),
 	)
 
 	err := val.ValidateSchemas(context.Background(), getAllSchemasIncludeMigration())
