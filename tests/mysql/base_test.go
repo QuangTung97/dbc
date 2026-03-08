@@ -31,14 +31,6 @@ func TestValidateSchemas(t *testing.T) {
 	)
 }
 
-func TestInsertAuthUser__Then_Get(t *testing.T) {
-	tests.RunTestInsertAuthUserThenGet(t, newTestConfig())
-}
-
-func TestInsertAuthUser__Then_Update(t *testing.T) {
-	tests.RunTestInsertAuthUserThenUpdate(t, newTestConfig())
-}
-
-func TestInsertAuthUser__Then_Update_Multi(t *testing.T) {
-	tests.RunTestInsertAuthUserThenUpdateMulti(t, newTestConfig())
+func TestInsertAuthUser(t *testing.T) {
+	tests.RunAllAuthUserTests(t, newTestConfig())
 }
