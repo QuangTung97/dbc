@@ -17,9 +17,10 @@ import (
 type fakeSchema struct {
 	dbc.SchemaInterface
 
-	tableName  string
-	fields     []dbc.FieldTraverseInfo
-	uniqueKeys []dbc.UniqueKeyInfo
+	tableName   string
+	fields      []dbc.FieldTraverseInfo
+	primaryKeys []string
+	uniqueKeys  []dbc.UniqueKeyInfo
 }
 
 func newFakeSchema(tableName string, fields ...dbc.FieldTraverseInfo) *fakeSchema {
@@ -47,6 +48,10 @@ func (s *fakeSchema) GetTypeString() string {
 
 func (s *fakeSchema) TraverseFields() iter.Seq[dbc.FieldTraverseInfo] {
 	return slices.Values(s.fields)
+}
+
+func (s *fakeSchema) GetPrimaryKeys() []string {
+	return s.primaryKeys
 }
 
 func (s *fakeSchema) GetUniqueKeys() []dbc.UniqueKeyInfo {
@@ -520,6 +525,141 @@ func TestValidator_ValidateSchemas__Unique_Key_Missing_In_Schema__Not_Enabled(t 
 			UniqueKeys: []UniqueKeyInfo{
 				{Columns: []string{"age", "role_id"}},
 			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, nil, err)
+}
+
+func TestValidator_ValidateSchemas__Primary_Key_Missing_In_DB(t *testing.T) {
+	s := newValidatorTest(
+		WithValidatePrimaryKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.primaryKeys = []string{"id", "age"}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(
+		t,
+		errors.New("mismatch schema primary key (id, age) with database primary key () in table 'table01'"),
+		err,
+	)
+}
+
+func TestValidator_ValidateSchemas__Primary_Key_Missing_In_Schema(t *testing.T) {
+	s := newValidatorTest(
+		WithValidatePrimaryKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			PrimaryKeys: []string{"age", "role_id"},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(
+		t,
+		errors.New("mismatch schema primary key () with database primary key (age, role_id) in table 'table01'"),
+		err,
+	)
+}
+
+func TestValidator_ValidateSchemas__Primary_Key_Match(t *testing.T) {
+	s := newValidatorTest(
+		WithValidatePrimaryKey(true),
+	)
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			PrimaryKeys: []string{"age", "role_id"},
+		},
+	}
+
+	schema := newFakeSchema(
+		"table01",
+		newFieldInfo("username", reflect.TypeOf("")),
+	)
+	schema.primaryKeys = []string{"age", "role_id"}
+
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{schema},
+	)
+	assert.Equal(t, nil, err)
+}
+
+func TestValidator_ValidateSchemas__Primary_Key_Missing_In_Schema__Not_Enabled(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "VARCHAR", Nullable: false},
+			},
+			PrimaryKeys: []string{"age", "role_id"},
 		},
 	}
 

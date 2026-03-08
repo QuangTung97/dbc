@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/QuangTung97/dbc"
@@ -126,6 +127,17 @@ func (v *Validator) validateSingleSchema(
 				"column '%s.%s %s' is incompatible with type '%s'",
 				table.Name, col, tableCol.DataType,
 				fieldInfo.Type.String(),
+			)
+		}
+	}
+
+	if v.conf.enableValidatePrimaryKey {
+		if !slices.Equal(schema.GetPrimaryKeys(), table.PrimaryKeys) {
+			return fmt.Errorf(
+				"mismatch schema primary key (%s) with database primary key (%s) in table '%s'",
+				strings.Join(schema.GetPrimaryKeys(), ", "),
+				strings.Join(table.PrimaryKeys, ", "),
+				table.Name,
 			)
 		}
 	}

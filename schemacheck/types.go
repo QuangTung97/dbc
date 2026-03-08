@@ -26,7 +26,7 @@ type IndexInfo struct {
 type TableInfo struct {
 	Name        string
 	Columns     []ColumnInfo
-	PrimaryKeys []string // TODO handle
+	PrimaryKeys []string
 	UniqueKeys  []UniqueKeyInfo
 	Indexes     []IndexInfo // TODO validate index list
 }

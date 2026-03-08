@@ -83,6 +83,7 @@ func TestValidateSchemas(t *testing.T) {
 	val := schemacheck.NewValidator(
 		mysqlcheck.NewLoader(tc.db, "testdb"),
 		mysqlcheck.DefaultMatchColumnType,
+		schemacheck.WithValidatePrimaryKey(true),
 		schemacheck.WithValidateUniqueKey(true),
 	)
 
