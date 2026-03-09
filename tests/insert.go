@@ -267,4 +267,7 @@ func RunAllAuthUserTests(t *testing.T, conf TestConfig) {
 	RunTestInsertAuthUserThenDelete(t, conf)
 	RunTestInsertAuthUserThenDeleteMulti(t, conf)
 	RunTestInsertAuthUserThenDeleteByCond(t, conf)
+
+	// TODO add tests for composite primary key (with nullable column)
+	// TODO add tests for postgres & sqlite3
 }

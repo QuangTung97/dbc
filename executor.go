@@ -14,7 +14,9 @@ type Executor[T TableNamer] struct {
 	commonBuilder[T]
 }
 
+// TODO support batching by default
 // TODO support executor with ignored field
+// TODO add query builder (in a separate package?)
 
 func NewExecutor[T TableNamer](
 	dialect DatabaseDialect, schema *Schema[T],
