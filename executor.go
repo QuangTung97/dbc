@@ -12,20 +12,50 @@ import (
 
 type Executor[T TableNamer] struct {
 	commonBuilder[T]
+
+	conf executorConfig
 }
 
-// TODO support batching by default
+type executorConfig struct {
+	batchSize int
+}
+
+func newExecutorConfig(options []ExecutorOption) executorConfig {
+	conf := executorConfig{
+		batchSize: 1024,
+	}
+	for _, fn := range options {
+		fn(&conf)
+	}
+	return conf
+}
+
+type ExecutorOption func(conf *executorConfig)
+
+// WithExecutorBatchSize default = 1024
+func WithExecutorBatchSize(batchSize int) ExecutorOption {
+	return func(conf *executorConfig) {
+		conf.batchSize = batchSize
+	}
+}
+
 // TODO support executor with ignored field
 // TODO add query builder (in a separate package?)
 
 func NewExecutor[T TableNamer](
 	dialect DatabaseDialect, schema *Schema[T],
+	options ...ExecutorOption,
 ) (*Executor[T], error) {
+	if err := validateDialect(dialect); err != nil {
+		return nil, err
+	}
+
 	return &Executor[T]{
 		commonBuilder: commonBuilder[T]{
 			dialect: dialect,
 			schema:  schema,
 		},
+		conf: newExecutorConfig(options),
 	}, nil
 }
 
@@ -50,20 +80,35 @@ func (e *Executor[T]) GetWithLock(ctx context.Context, id T) (null.Null[T], erro
 	return NullGet[T](ctx, buf.String(), args...)
 }
 
-func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
-	if len(idList) == 0 {
-		return nil, nil
+func splitByBatch[T any](batchSize int, values []T, callback func(values []T) error) error {
+	for index := 0; index < len(values); {
+		nextIndex := index + batchSize
+		if nextIndex > len(values) {
+			nextIndex = len(values)
+		}
+		if err := callback(values[index:nextIndex]); err != nil {
+			return err
+		}
+		index = nextIndex
 	}
+	return nil
+}
 
-	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
-	args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
+func (e *Executor[T]) GetMulti(ctx context.Context, idList []T) ([]T, error) {
+	var finalResult []T
+	err := splitByBatch(e.conf.batchSize, idList, func(idList []T) error {
+		var buf strings.Builder
+		primaryKeys, primaryOffsets := e.buildSelectQuery(&buf, true)
+		args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
 
-	// execute
-	tx := GetReadonly(ctx)
-	var result []T
-	err := tx.SelectContext(ctx, &result, buf.String(), args...)
-	return result, err
+		// execute
+		tx := GetReadonly(ctx)
+		var tmpResult []T
+		err := tx.SelectContext(ctx, &tmpResult, buf.String(), args...)
+		finalResult = append(finalResult, tmpResult...)
+		return err
+	})
+	return finalResult, err
 }
 
 func (e *Executor[T]) buildWhereCondFromCond(buf *strings.Builder, cond CondBuilderFunc[T]) ([]any, bool) {
@@ -274,6 +319,12 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 }
 
 func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
+	return splitByBatch(e.conf.batchSize, entities, func(entities []*T) error {
+		return e.insertMultiPerBatch(ctx, entities)
+	})
+}
+
+func (e *Executor[T]) insertMultiPerBatch(ctx context.Context, entities []*T) error {
 	for _, entity := range entities {
 		entityVal := reflect.ValueOf(entity).Elem()
 		if err := e.validateInsertEntity(entityVal); err != nil {
@@ -410,12 +461,23 @@ func WithOnConflictColumns[T TableNamer](columnsFunc ColumnGetterFunc[T]) Upsert
 	}
 }
 
-// InsertOrUpdateMulti does update by default
 func (e *Executor[T]) InsertOrUpdateMulti(
 	ctx context.Context,
 	entities []T,
 	updateFunc UpdateMultiBuilderFunc[T],
 	options ...UpsertOption[T],
+) error {
+	return splitByBatch(e.conf.batchSize, entities, func(entities []T) error {
+		return e.insertOrUpdateMultiPerBatch(ctx, entities, updateFunc, options)
+	})
+}
+
+// InsertOrUpdateMulti does update by default
+func (e *Executor[T]) insertOrUpdateMultiPerBatch(
+	ctx context.Context,
+	entities []T,
+	updateFunc UpdateMultiBuilderFunc[T],
+	options []UpsertOption[T],
 ) error {
 	var buf strings.Builder
 
@@ -568,13 +630,15 @@ func (e *Executor[T]) Delete(ctx context.Context, entity T) error {
 }
 
 func (e *Executor[T]) DeleteMulti(ctx context.Context, idList []T) error {
-	var buf strings.Builder
-	primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
-	args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
+	return splitByBatch(e.conf.batchSize, idList, func(idList []T) error {
+		var buf strings.Builder
+		primaryKeys, primaryOffsets := e.buildDeleteQuery(&buf)
+		args := e.buildColumnsWhereInCond(&buf, primaryKeys, primaryOffsets, idList)
 
-	tx := GetTx(ctx)
-	_, err := tx.ExecContext(ctx, buf.String(), args...)
-	return err
+		tx := GetTx(ctx)
+		_, err := tx.ExecContext(ctx, buf.String(), args...)
+		return err
+	})
 }
 
 func (e *Executor[T]) DeleteCond(ctx context.Context, cond CondBuilderFunc[T]) error {

@@ -1,6 +1,9 @@
 package dbc
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type DatabaseDialect int
 
@@ -10,6 +13,15 @@ const (
 	DialectPostgres
 	DialectSQLite3
 )
+
+func validateDialect(d DatabaseDialect) error {
+	switch d {
+	case DialectMySQL, DialectMySQL5x, DialectPostgres, DialectSQLite3:
+		return nil
+	default:
+		return fmt.Errorf("dbc: invalid dialect '%d'", d)
+	}
+}
 
 func (d DatabaseDialect) withReturningSyntax() bool {
 	switch d {

@@ -69,8 +69,8 @@ func newExecTest(_ *testing.T) *executorTest {
 	return e
 }
 
-func (e *executorTest) newExecMySQL() *Executor[tableTest03] {
-	exec, err := NewExecutor(DialectMySQL, e.schema)
+func (e *executorTest) newExecMySQL(options ...ExecutorOption) *Executor[tableTest03] {
+	exec, err := NewExecutor(DialectMySQL, e.schema, options...)
 	if err != nil {
 		panic(err)
 	}
@@ -357,6 +357,62 @@ func TestExecutor_MySQL__Insert_Multi(t *testing.T) {
 	assert.Equal(t, int64(62), entity2.ID)
 }
 
+func TestExecutor_MySQL__Insert_Multi__With_Batch_Size_2(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL(
+		WithExecutorBatchSize(2),
+	)
+
+	entity1 := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+	entity3 := tableTest03{
+		RoleID:   23,
+		Username: "user03",
+		Age:      33,
+	}
+
+	// do insert
+	err := exec.InsertMulti(e.ctx, []*tableTest03{&entity1, &entity2, &entity3})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 2, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"INSERT INTO `table_test03` (`role_id`, `username`, `age`)",
+			"VALUES (?, ?, ?), (?, ?, ?)",
+		),
+		e.execQueries[0],
+	)
+	assert.Equal(
+		t,
+		joinString(
+			"INSERT INTO `table_test03` (`role_id`, `username`, `age`)",
+			"VALUES (?, ?, ?)",
+		),
+		e.execQueries[1],
+	)
+
+	// check args
+	assert.Equal(t, 2, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity1.RoleID, entity1.Username, entity1.Age,
+		entity2.RoleID, entity2.Username, entity2.Age,
+	}, e.execArgs[0])
+	assert.Equal(t, []any{
+		entity3.RoleID, entity3.Username, entity3.Age,
+	}, e.execArgs[1])
+}
+
 func TestExecutor_PostgresL__Insert_Multi(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecPostgres()
@@ -604,6 +660,80 @@ func TestExecutor_MySQL__Update_Multi(t *testing.T) {
 		entity1.ID, entity1.RoleID, entity1.Username, entity1.Age,
 		entity2.ID, entity2.RoleID, entity2.Username, entity2.Age,
 	}, e.execArgs[0])
+}
+
+func TestExecutor_MySQL__Update_Multi__With_Batch_Size_2(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL(
+		WithExecutorBatchSize(2),
+	)
+
+	entity1 := tableTest03{
+		ID:       11,
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+	entity2 := tableTest03{
+		ID:       12,
+		RoleID:   22,
+		Username: "user02",
+		Age:      32,
+	}
+	entity3 := tableTest03{
+		ID:       13,
+		RoleID:   23,
+		Username: "user03",
+		Age:      33,
+	}
+
+	// do update
+	err := exec.InsertOrUpdateMulti(
+		e.ctx, []tableTest03{entity1, entity2, entity3},
+		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
+			UpdateMultiAssign(b, &table.Username)
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 2, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"INSERT INTO `table_test03`",
+			"(`id`, `role_id`, `username`, `age`)",
+			"VALUES",
+			"(?, ?, ?, ?), (?, ?, ?, ?)",
+			"AS new_values",
+			"ON DUPLICATE KEY UPDATE",
+			"`username` = new_values.`username`",
+		),
+		e.execQueries[0],
+	)
+	assert.Equal(
+		t,
+		joinString(
+			"INSERT INTO `table_test03`",
+			"(`id`, `role_id`, `username`, `age`)",
+			"VALUES",
+			"(?, ?, ?, ?)",
+			"AS new_values",
+			"ON DUPLICATE KEY UPDATE",
+			"`username` = new_values.`username`",
+		),
+		e.execQueries[1],
+	)
+
+	// check args
+	assert.Equal(t, 2, len(e.execArgs))
+	assert.Equal(t, []any{
+		entity1.ID, entity1.RoleID, entity1.Username, entity1.Age,
+		entity2.ID, entity2.RoleID, entity2.Username, entity2.Age,
+	}, e.execArgs[0])
+	assert.Equal(t, []any{
+		entity3.ID, entity3.RoleID, entity3.Username, entity3.Age,
+	}, e.execArgs[1])
 }
 
 func TestExecutor_MySQL__Update_Multi__Empty_Update_Block(t *testing.T) {
@@ -1052,6 +1182,46 @@ func TestExecutor_MySQL__DeleteMulti(t *testing.T) {
 	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.execArgs[0])
 }
 
+func TestExecutor_MySQL__DeleteMulti__With_Batch_Size_2(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL(
+		WithExecutorBatchSize(2),
+	)
+
+	entity1 := tableTest03{ID: 11}
+	entity2 := tableTest03{ID: 12}
+	entity3 := tableTest03{ID: 13}
+	entity4 := tableTest03{ID: 14}
+
+	// do delete
+	err := exec.DeleteMulti(e.ctx, []tableTest03{entity1, entity2, entity3, entity4})
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 2, len(e.execQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"DELETE FROM `table_test03`",
+			"WHERE `id` IN (?, ?)",
+		),
+		e.execQueries[0],
+	)
+	assert.Equal(
+		t,
+		joinString(
+			"DELETE FROM `table_test03`",
+			"WHERE `id` IN (?, ?)",
+		),
+		e.execQueries[1],
+	)
+
+	// check args
+	assert.Equal(t, 2, len(e.execArgs))
+	assert.Equal(t, []any{entity1.ID, entity2.ID}, e.execArgs[0])
+	assert.Equal(t, []any{entity3.ID, entity4.ID}, e.execArgs[1])
+}
+
 func TestExecutor_MySQL__DeleteMulti__Composite_Key(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecTable04()
@@ -1217,6 +1387,48 @@ func TestExecutor_MySQL__GetMulti(t *testing.T) {
 	// check args
 	assert.Equal(t, 1, len(e.selectArgs))
 	assert.Equal(t, []any{entity1.ID, entity2.ID, entity3.ID}, e.selectArgs[0])
+}
+
+func TestExecutor_MySQL__GetMulti__With_Batch_Size_2(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecMySQL(
+		WithExecutorBatchSize(2),
+	)
+
+	entity1 := tableTest03{ID: 11}
+	entity2 := tableTest03{ID: 12}
+	entity3 := tableTest03{ID: 13}
+
+	// do get multi
+	userList, err := exec.GetMulti(e.ctx, []tableTest03{entity1, entity2, entity3})
+	assert.Equal(t, nil, err)
+	assert.Equal(t, []tableTest03(nil), userList)
+
+	// check query
+	assert.Equal(t, 2, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `id` IN (?, ?)",
+		),
+		e.selectQueries[0],
+	)
+	assert.Equal(
+		t,
+		joinString(
+			"SELECT `id`, `role_id`, `username`, `age`",
+			"FROM `table_test03`",
+			"WHERE `id` IN (?)",
+		),
+		e.selectQueries[1],
+	)
+
+	// check args
+	assert.Equal(t, 2, len(e.selectArgs))
+	assert.Equal(t, []any{entity1.ID, entity2.ID}, e.selectArgs[0])
+	assert.Equal(t, []any{entity3.ID}, e.selectArgs[1])
 }
 
 func TestExecutor_MySQL__Empty(t *testing.T) {
