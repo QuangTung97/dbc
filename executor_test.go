@@ -759,7 +759,7 @@ func TestExecutor_MySQL__Update_Multi__Empty_Update_Block(t *testing.T) {
 		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
 		},
 	)
-	assert.Equal(t, NewError(errorCodeUpdateBlockEmpty, "update block must not be empty"), err)
+	assert.Equal(t, NewError(1, "update block must not be empty"), err)
 	assert.Equal(t, "dbc [E01]: update block must not be empty", err.Error())
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -1119,7 +1119,7 @@ func TestExecutor_MySQL__Update_Cond__Empty_Update(t *testing.T) {
 			CondEqual(b, &table.RoleID, testRoleID(11))
 		},
 	)
-	assert.Equal(t, NewError(8, "not allow empty update expression"), err)
+	assert.Equal(t, NewError(1, "not allow empty update expression"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))

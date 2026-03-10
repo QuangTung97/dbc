@@ -3,14 +3,13 @@ package dbc
 import "fmt"
 
 const (
-	errorCodeUpdateBlockEmpty = iota + 1
+	errorCodeEmptyUpdate = iota + 1
 	errorCodeValidateConvert
 	errorCodePanic
 	errorCodeInvalidDialect
 	errorCodeFieldMustNonZero
 	errorCodeFieldMustZero
 	errorCodeEmptyWhere
-	errorCodeEmptyUpdate
 )
 
 type Error struct {

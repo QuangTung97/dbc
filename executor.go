@@ -573,7 +573,7 @@ func (e *Executor[T]) insertOrUpdateMultiPerBatch(
 	buf.WriteString(builder.GetFullExpr())
 
 	if len(builder.exprList) == 0 {
-		return NewError(errorCodeUpdateBlockEmpty, "update block must not be empty")
+		return NewError(errorCodeEmptyUpdate, "update block must not be empty")
 	}
 
 	tx := GetTx(ctx)
