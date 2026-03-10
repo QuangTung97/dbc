@@ -1,7 +1,6 @@
 package dbc
 
 import (
-	"fmt"
 	"iter"
 	"reflect"
 	"unsafe"
@@ -291,8 +290,9 @@ func ValidateFunc[T TableNamer, F any](s *Schema[T], field *F, fn func(value F) 
 		fieldVal, ok := val.(F)
 		if !ok {
 			var fieldObj F
-			return fmt.Errorf(
-				"schema validate: can not convert from '%s' to '%s'",
+			return Errorf(
+				errorCodeValidateConvert,
+				"can not convert from '%s' to '%s'",
 				reflect.TypeOf(val).String(),
 				reflect.TypeOf(fieldObj).String(),
 			)

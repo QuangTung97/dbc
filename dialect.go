@@ -1,7 +1,6 @@
 package dbc
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -19,7 +18,7 @@ func validateDialect(d DatabaseDialect) error {
 	case DialectMySQL, DialectMySQL5x, DialectPostgres, DialectSQLite3:
 		return nil
 	default:
-		return fmt.Errorf("dbc: invalid dialect '%d'", d)
+		return Errorf(errorCodeInvalidDialect, "invalid dialect '%d'", d)
 	}
 }
 

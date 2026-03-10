@@ -204,7 +204,7 @@ func TestExecutor_MySQL__Insert__Validate_Error(t *testing.T) {
 
 	// do insert
 	err := exec.Insert(e.ctx, &entity)
-	assert.Equal(t, errors.New("field 'Age' of struct 'dbc.tableTest03' must not be zero"), err)
+	assert.Equal(t, NewError(5, "field 'Age' of struct 'dbc.tableTest03' must not be zero"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -263,7 +263,7 @@ func TestExecutor_MySQL__Insert__ID_Not_Zero__Error(t *testing.T) {
 
 	// do insert
 	err := exec.Insert(e.ctx, &entity)
-	assert.Equal(t, errors.New("field 'ID' of struct 'dbc.tableTest03' must be zero"), err)
+	assert.Equal(t, NewError(6, "field 'ID' of struct 'dbc.tableTest03' must be zero"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -759,7 +759,8 @@ func TestExecutor_MySQL__Update_Multi__Empty_Update_Block(t *testing.T) {
 		func(b *UpdateMultiBuilder[tableTest03], table *tableTest03) {
 		},
 	)
-	assert.Equal(t, errors.New("update block must not be empty"), err)
+	assert.Equal(t, NewError(errorCodeUpdateBlockEmpty, "update block must not be empty"), err)
+	assert.Equal(t, "dbc [E01]: update block must not be empty", err.Error())
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
 }
@@ -794,7 +795,7 @@ func TestExecutor_MySQL__Update_Multi__Entity_Missing_ID(t *testing.T) {
 			})
 		},
 	)
-	assert.Equal(t, errors.New("field 'ID' of struct 'dbc.tableTest03' must not be zero"), err)
+	assert.Equal(t, NewError(5, "field 'ID' of struct 'dbc.tableTest03' must not be zero"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -1019,7 +1020,7 @@ func TestExecutor_MySQL__Update_Cond__Username_Empty__Error(t *testing.T) {
 			CondEqual(b, &table.RoleID, testRoleID(11))
 		},
 	)
-	assert.Equal(t, errors.New("field 'Username' of struct 'dbc.tableTest03' must not be zero"), err)
+	assert.Equal(t, NewError(5, "field 'Username' of struct 'dbc.tableTest03' must not be zero"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -1099,7 +1100,7 @@ func TestExecutor_MySQL__Update_Cond__Empty_Where(t *testing.T) {
 		func(b *CondBuilder[tableTest03], table *tableTest03) {
 		},
 	)
-	assert.Equal(t, errors.New("not allow empty where condition"), err)
+	assert.Equal(t, NewError(7, "not allow empty where condition"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -1118,7 +1119,7 @@ func TestExecutor_MySQL__Update_Cond__Empty_Update(t *testing.T) {
 			CondEqual(b, &table.RoleID, testRoleID(11))
 		},
 	)
-	assert.Equal(t, errors.New("not allow empty update expression"), err)
+	assert.Equal(t, NewError(8, "not allow empty update expression"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))
@@ -1286,7 +1287,7 @@ func TestExecutor_MySQL__DeleteCond__No_Cond(t *testing.T) {
 
 	// do delete
 	err := exec.DeleteCond(e.ctx, func(b *CondBuilder[tableTest03], table *tableTest03) {})
-	assert.Equal(t, errors.New("delete where condition must not be empty"), err)
+	assert.Equal(t, NewError(7, "delete where condition must not be empty"), err)
 
 	// check query
 	assert.Equal(t, 0, len(e.execQueries))

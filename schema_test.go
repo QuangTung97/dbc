@@ -1,7 +1,6 @@
 package dbc
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -253,5 +252,7 @@ func TestRegisterSchema__Validate_Func__With_Invalid_Object_Type(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, len(ageInfo.validatorList))
-	assert.Equal(t, errors.New("schema validate: can not convert from 'string' to 'int'"), ageInfo.validatorList[0]("hello"))
+	err := ageInfo.validatorList[0]("hello")
+	assert.Equal(t, NewError(2, "can not convert from 'string' to 'int'"), err)
+	assert.Equal(t, "dbc [E02]: can not convert from 'string' to 'int'", err.Error())
 }

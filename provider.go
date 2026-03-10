@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"runtime/debug"
 
 	"github.com/jmoiron/sqlx"
@@ -94,7 +93,7 @@ func (p *providerImpl) Transact(ctx context.Context, fn func(ctx context.Context
 	defer func() {
 		if r := recover(); r != nil {
 			debug.PrintStack()
-			err = fmt.Errorf("panic: %v", r)
+			err = Errorf(errorCodePanic, "panic with value: %v", r)
 		}
 		if err != nil {
 			_ = tx.Rollback()

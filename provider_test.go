@@ -222,7 +222,7 @@ func TestProvider__Transact__Panic_Inside(t *testing.T) {
 		insertAuthUser(ctx, &user01)
 		panic("some value")
 	})
-	assert.Equal(t, errors.New("panic: some value"), err)
+	assert.Equal(t, NewError(3, "panic with value: some value"), err)
 
 	// get
 	readCtx := provider.Readonly(context.Background())

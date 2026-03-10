@@ -2,8 +2,6 @@ package dbc
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -232,7 +230,11 @@ func (e *Executor[T]) validateFieldNonZero(info fieldInfo, fieldVal reflect.Valu
 		return nil
 	}
 
-	return fmt.Errorf("field '%s' of struct '%s' must not be zero", info.fieldName, e.schema.typeString)
+	return Errorf(
+		errorCodeFieldMustNonZero,
+		"field '%s' of struct '%s' must not be zero",
+		info.fieldName, e.schema.typeString,
+	)
 }
 
 func (e *Executor[T]) validateFieldValueOfEntity(info fieldInfo, entity reflect.Value) error {
@@ -264,7 +266,11 @@ func (e *Executor[T]) validateInsertEntity(entity reflect.Value) error {
 		if info.isAutoInc {
 			fieldVal := getValueOfStructFieldAt(entity, info.indices)
 			if !fieldVal.IsZero() {
-				return fmt.Errorf("field '%s' of struct '%s' must be zero", info.fieldName, e.schema.typeString)
+				return Errorf(
+					errorCodeFieldMustZero,
+					"field '%s' of struct '%s' must be zero",
+					info.fieldName, e.schema.typeString,
+				)
 			}
 		} else {
 			if err := e.validateFieldValueOfEntity(info, entity); err != nil {
@@ -359,7 +365,7 @@ func (e *Executor[T]) insertMultiPerBatch(ctx context.Context, entities []*T) er
 		idIndices := e.schema.fieldInfos[idOffset].indices
 		for index, idVal := range result {
 			if index >= len(entities) {
-				return fmt.Errorf("id list is bigger than input entities")
+				return Errorf(0, "id list is bigger than input entities")
 			}
 			entity := entities[index]
 			entityVal := reflect.ValueOf(entity).Elem()
@@ -567,7 +573,7 @@ func (e *Executor[T]) insertOrUpdateMultiPerBatch(
 	buf.WriteString(builder.GetFullExpr())
 
 	if len(builder.exprList) == 0 {
-		return errors.New("update block must not be empty")
+		return NewError(errorCodeUpdateBlockEmpty, "update block must not be empty")
 	}
 
 	tx := GetTx(ctx)
@@ -589,7 +595,7 @@ func (e *Executor[T]) UpdateCond(
 	updateFunc(updateBuilder, updateTable)
 
 	if len(updateBuilder.exprList) == 0 {
-		return 0, fmt.Errorf("not allow empty update expression")
+		return 0, NewError(errorCodeEmptyUpdate, "not allow empty update expression")
 	}
 
 	// validate values of simple updated columns
@@ -605,7 +611,7 @@ func (e *Executor[T]) UpdateCond(
 
 	condArgs, isEmpty := e.buildWhereCondFromCond(&buf, condFunc)
 	if isEmpty {
-		return 0, fmt.Errorf("not allow empty where condition")
+		return 0, NewError(errorCodeEmptyWhere, "not allow empty where condition")
 	}
 	args = append(args, condArgs...)
 
@@ -648,7 +654,7 @@ func (e *Executor[T]) DeleteCond(ctx context.Context, cond CondBuilderFunc[T]) e
 
 	args, isEmpty := e.buildWhereCondFromCond(&buf, cond)
 	if isEmpty {
-		return fmt.Errorf("delete where condition must not be empty")
+		return NewError(errorCodeEmptyWhere, "delete where condition must not be empty")
 	}
 
 	tx := GetTx(ctx)
