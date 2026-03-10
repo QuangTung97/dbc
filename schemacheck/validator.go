@@ -120,7 +120,9 @@ func (v *Validator) validateSingleSchema(
 				return fmt.Errorf("column '%s.%s' must be nullable", table.Name, col)
 			}
 		} else {
-			// TODO validate column must be NOT NULL here
+			if tableCol.Nullable {
+				return fmt.Errorf("column '%s.%s' must be NOT NULL", table.Name, col)
+			}
 		}
 
 		tableCol.DataType = strings.ToLower(tableCol.DataType)

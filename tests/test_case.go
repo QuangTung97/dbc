@@ -17,6 +17,7 @@ type TestCase struct {
 	Ctx context.Context
 
 	UserExec *dbc.Executor[AuthUser]
+	PermExec *dbc.Executor[UserPermission]
 }
 
 type TestConfig struct {
@@ -39,6 +40,7 @@ func NewTestCase(_ *testing.T, conf TestConfig) *TestCase {
 
 	// init executors
 	tc.UserExec, _ = dbc.NewExecutor(conf.Dialect, AuthUserSchema)
+	tc.PermExec, _ = dbc.NewExecutor(conf.Dialect, UserPermissionSchema)
 
 	return tc
 }

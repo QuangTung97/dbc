@@ -260,6 +260,62 @@ func RunTestInsertAuthUserThenDeleteByCond(t *testing.T, conf TestConfig) {
 	assert.Equal(t, []AuthUser{user1, user3}, users)
 }
 
+func RunTestInsertUserPermissionThenGet(t *testing.T, conf TestConfig) {
+	tc := NewTestCase(t, conf)
+	exec := tc.PermExec
+
+	perm1 := UserPermission{
+		UserID: 21,
+		Perm:   "perm01",
+	}
+	perm2 := UserPermission{
+		UserID: 22,
+		Perm:   "perm02",
+		Desc:   null.New("desc 02"),
+	}
+	perm3 := UserPermission{
+		UserID: 23,
+		Perm:   "perm03",
+		Desc:   null.New("desc 03"),
+	}
+	err := exec.Insert(tc.Ctx, &perm1)
+	assert.Equal(t, nil, err)
+
+	// insert multi
+	err = exec.InsertMulti(tc.Ctx, []*UserPermission{&perm2, &perm3})
+	assert.Equal(t, nil, err)
+
+	// get all
+	getAllFunc := func() []UserPermission {
+		perms, err := exec.SelectCond(tc.Ctx, func(cond *dbc.CondBuilder[UserPermission], table *UserPermission) {
+			dbc.CondOrderBy(cond, func(b *dbc.OrderByBuilder[UserPermission]) {
+				dbc.OrderByDesc(b, &table.UserID)
+				dbc.OrderByDesc(b, &table.Perm)
+			})
+		})
+		assert.Equal(t, nil, err)
+		return perms
+	}
+	perms := getAllFunc()
+	assert.Equal(t, []UserPermission{perm3, perm2, perm1}, perms)
+
+	// update multi
+	perm2.Desc = null.New("new desc 12")
+	perm3.Desc = null.New("new desc 13")
+	err = exec.InsertOrUpdateMulti(
+		tc.Ctx,
+		[]UserPermission{perm2, perm3},
+		func(b *dbc.UpdateMultiBuilder[UserPermission], table *UserPermission) {
+			dbc.UpdateMultiAssign(b, &table.Desc)
+		},
+	)
+	assert.Equal(t, nil, err)
+
+	// get all again
+	perms = getAllFunc()
+	assert.Equal(t, []UserPermission{perm3, perm2, perm1}, perms)
+}
+
 func RunAllAuthUserTests(t *testing.T, conf TestConfig) {
 	RunTestInsertAuthUserThenGet(t, conf)
 	RunTestInsertAuthUserThenUpdate(t, conf)
@@ -268,6 +324,6 @@ func RunAllAuthUserTests(t *testing.T, conf TestConfig) {
 	RunTestInsertAuthUserThenDeleteMulti(t, conf)
 	RunTestInsertAuthUserThenDeleteByCond(t, conf)
 
-	// TODO add tests for composite primary key (with nullable column)
+	RunTestInsertUserPermissionThenGet(t, conf)
 	// TODO add tests for postgres & sqlite3
 }

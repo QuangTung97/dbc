@@ -10,17 +10,27 @@ import (
 
 	"github.com/QuangTung97/dbc"
 	"github.com/QuangTung97/dbc/dbmigrate"
+	"github.com/QuangTung97/dbc/null"
 )
 
 type UserID int64
+
+type Timestamps struct {
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+func TimestampsSchema[T dbc.TableNamer](s *dbc.Schema[T], ts *Timestamps) {
+	dbc.SchemaIgnore(s, &ts.CreatedAt)
+	dbc.SchemaIgnore(s, &ts.UpdatedAt)
+}
 
 type AuthUser struct {
 	ID       UserID `db:"id"`
 	Username string `db:"username"`
 	Age      int32  `db:"age"`
 
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	Timestamps
 }
 
 func (AuthUser) TableName() string {
@@ -32,8 +42,7 @@ var AuthUserSchema = dbc.RegisterSchema(func(s *dbc.Schema[AuthUser], table *Aut
 	dbc.SchemaConst(s, &table.Username)
 	dbc.SchemaEditable(s, &table.Age)
 
-	dbc.SchemaIgnore(s, &table.CreatedAt)
-	dbc.SchemaIgnore(s, &table.UpdatedAt)
+	TimestampsSchema(s, &table.Timestamps)
 
 	dbc.SchemaUniqueKey(s, func(g *dbc.ColumnGetter[AuthUser], table *AuthUser) {
 		dbc.ReturnColumn(g, &table.Username)
@@ -43,6 +52,30 @@ var AuthUserSchema = dbc.RegisterSchema(func(s *dbc.Schema[AuthUser], table *Aut
 		dbc.ReturnColumn(g, &table.Age)
 		dbc.ReturnColumn(g, &table.Username)
 	})
+})
+
+// ---------------------------------------------------------------------------
+
+type UserPermission struct {
+	UserID UserID            `db:"user_id"`
+	Perm   string            `db:"perm"`
+	Desc   null.Null[string] `db:"perm_desc"`
+
+	Timestamps
+}
+
+func (u UserPermission) TableName() string {
+	return "user_permission"
+}
+
+var UserPermissionSchema = dbc.RegisterSchema(func(s *dbc.Schema[UserPermission], table *UserPermission) {
+	dbc.SchemaPrimaryKey(s, &table.UserID)
+	dbc.SchemaPrimaryKey(s, &table.Perm)
+
+	dbc.SchemaEditable(s, &table.Desc)
+	dbc.ValidateOptional(s, &table.Desc)
+
+	TimestampsSchema(s, &table.Timestamps)
 })
 
 // ---------------------------------------------------------------------------

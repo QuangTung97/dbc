@@ -342,6 +342,37 @@ func TestValidator_ValidateSchemas__Columns_Match__Null_String__DB_Non_Nullable_
 	assert.Equal(t, errors.New("column 'table01.username' must be nullable"), err)
 }
 
+func TestValidator_ValidateSchemas__Columns_Match__Not_Null_String__DB_Nullable__Error(t *testing.T) {
+	s := newValidatorTest()
+
+	s.infos = []TableInfo{
+		{
+			Name: "table01",
+			Columns: []ColumnInfo{
+				{Name: "username", DataType: "varchar", Nullable: true},
+			},
+		},
+	}
+
+	// string to varchar
+	s.matchList = []matchEntry{
+		{schemaType: reflect.TypeOf(""), dbType: "varchar"},
+	}
+
+	// do validate
+	var empty string
+	err := s.val.ValidateSchemas(
+		context.Background(),
+		[]dbc.SchemaInterface{
+			newFakeSchema(
+				"table01",
+				newFieldInfo("username", reflect.TypeOf(empty)),
+			),
+		},
+	)
+	assert.Equal(t, errors.New("column 'table01.username' must be NOT NULL"), err)
+}
+
 func TestValidator_ValidateSchemas__Pointer_Column__Error(t *testing.T) {
 	s := newValidatorTest()
 
