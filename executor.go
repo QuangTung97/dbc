@@ -310,6 +310,8 @@ func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
 		return err
 	}
 
+	// TODO support postgres & sqlite3 returning id
+
 	if autoIncField.Valid {
 		autoIncOffset := autoIncField.Data
 		insertID, err := result.LastInsertId()

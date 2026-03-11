@@ -2,7 +2,6 @@ package postgrescheck
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jmoiron/sqlx"
 
@@ -65,6 +64,8 @@ func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, err
 		return nil, err
 	}
 
+	// TODO Load index infos, primary keys, unique keys
+
 	return result, nil
 }
 
@@ -75,10 +76,6 @@ func (s *mysqlLoader) loadTableColumnsInfo(ctx context.Context) ([]schemacheck.T
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	for _, col := range columnList {
-		fmt.Println("COL:", col)
 	}
 
 	columnsByTable := map[string][]InformationColumn{}

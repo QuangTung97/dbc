@@ -27,7 +27,7 @@ func TimestampsSchema[T dbc.TableNamer](s *dbc.Schema[T], ts *Timestamps) {
 type AuthUser struct {
 	ID       UserID `db:"id"`
 	Username string `db:"username"`
-	Age      int32  `db:"age"`
+	Age      int64  `db:"age"`
 
 	Timestamps
 }
