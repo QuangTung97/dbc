@@ -1,11 +1,11 @@
-package mysql_test
+package postgres_test
 
 import (
 	"embed"
 	"testing"
 
 	"github.com/QuangTung97/dbc"
-	mysqlcheck "github.com/QuangTung97/dbc/schemacheck/mysql"
+	postgrescheck "github.com/QuangTung97/dbc/schemacheck/postgres"
 	"tests"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -18,10 +18,9 @@ func newTestConfig() tests.TestConfig {
 	return tests.TestConfig{
 		MigrationsDir: migrationsDir,
 		SubDir:        "migrations",
-		Dialect:       dbc.DialectMySQL,
+		Dialect:       dbc.DialectPostgres,
 
 		DriverName: "mysql",
-		DSN:        "root:pass@tcp(localhost:3306)/testdb?parseTime=true&multiStatements=true",
 	}
 }
 
@@ -29,8 +28,8 @@ func TestValidateSchemas(t *testing.T) {
 	tests.RunTestValidateSchemas(
 		t,
 		newTestConfig(),
-		mysqlcheck.NewLoader,
-		mysqlcheck.DefaultMatchColumnType,
+		postgrescheck.NewLoader,
+		postgrescheck.DefaultMatchColumnType,
 	)
 }
 

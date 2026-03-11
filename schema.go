@@ -124,7 +124,7 @@ func RegisterSchema[T TableNamer](
 	s.tableName = (*s.def.table).TableName()
 
 	for scanInfo := range traverseFieldsOfType(s.def.tableType) {
-		offset := fieldOffsetType(scanInfo.offset)
+		offset := scanInfo.offset
 		s.allFields = append(s.allFields, offset)
 
 		dbName := scanInfo.dbName

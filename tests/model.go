@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"embed"
 	"reflect"
 	"sync"
 	"time"
@@ -109,18 +108,15 @@ func getCurrentPackage() string {
 var globalOnce sync.Once
 var globalDB *sqlx.DB
 
-func GetNewDB(migrationsDir embed.FS, subDir string, dialect dbc.DatabaseDialect) *sqlx.DB {
+func GetNewDB(conf TestConfig) *sqlx.DB {
 	globalOnce.Do(func() {
-		db := sqlx.MustConnect(
-			"mysql",
-			"root:pass@tcp(localhost:3306)/testdb?parseTime=true&multiStatements=true",
-		)
+		db := sqlx.MustConnect(conf.DriverName, conf.DSN)
 
 		for _, schema := range GetAllSchemasIncludeMigration() {
 			db.MustExec(`DROP TABLE IF EXISTS ` + schema.GetTableName())
 		}
 
-		dbmigrate.MigrateUp(db, migrationsDir, subDir, dialect)
+		dbmigrate.MigrateUp(db, conf.MigrationsDir, conf.SubDir, conf.Dialect)
 
 		globalDB = db
 	})

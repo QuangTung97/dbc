@@ -24,11 +24,14 @@ type TestConfig struct {
 	MigrationsDir embed.FS
 	SubDir        string
 	Dialect       dbc.DatabaseDialect
+
+	DriverName string
+	DSN        string
 }
 
 func NewTestCase(_ *testing.T, conf TestConfig) *TestCase {
 	tc := &TestCase{}
-	tc.DB = GetNewDB(conf.MigrationsDir, conf.SubDir, conf.Dialect)
+	tc.DB = GetNewDB(conf)
 
 	provider := dbc.NewProvider(tc.DB)
 	tc.Ctx = provider.Autocommit(context.Background())
