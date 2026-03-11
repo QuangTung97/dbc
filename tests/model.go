@@ -47,7 +47,7 @@ var AuthUserSchema = dbc.RegisterSchema(func(s *dbc.Schema[AuthUser], table *Aut
 		dbc.ReturnColumn(g, &table.Username)
 	})
 
-	dbc.SchemaIndex(s, "idx_age_username", func(g *dbc.ColumnGetter[AuthUser], table *AuthUser) {
+	dbc.SchemaIndex(s, "idx_auth_user_age_username", func(g *dbc.ColumnGetter[AuthUser], table *AuthUser) {
 		dbc.ReturnColumn(g, &table.Age)
 		dbc.ReturnColumn(g, &table.Username)
 	})

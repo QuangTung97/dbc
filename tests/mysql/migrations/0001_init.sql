@@ -9,7 +9,7 @@ CREATE TABLE auth_user
     CONSTRAINT uk_username UNIQUE (username)
 );
 
-CREATE INDEX idx_age_username ON auth_user (age, username);
+CREATE INDEX idx_auth_user_age_username ON auth_user (age, username);
 
 CREATE TABLE user_permission
 (

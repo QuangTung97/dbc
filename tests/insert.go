@@ -325,5 +325,5 @@ func RunAllAuthUserTests(t *testing.T, conf TestConfig) {
 	RunTestInsertAuthUserThenDeleteByCond(t, conf)
 
 	RunTestInsertUserPermissionThenGet(t, conf)
-	// TODO add tests for postgres & sqlite3
+	// TODO add tests for sqlite3
 }
