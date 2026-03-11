@@ -315,6 +315,46 @@ func TestExecutor_MySQL__Insert__ID_Not_Auto_Inc(t *testing.T) {
 	assert.Equal(t, int64(11), entity.ID)
 }
 
+func TestExecutor_Postgres__Insert(t *testing.T) {
+	e := newExecTest(t)
+	exec := e.newExecPostgres()
+
+	entity := tableTest03{
+		RoleID:   21,
+		Username: "user01",
+		Age:      31,
+	}
+
+	e.selectHandler = func(dest any) {
+		idList := dest.(*[]int64)
+		*idList = []int64{67}
+	}
+
+	// do insert
+	err := exec.Insert(e.ctx, &entity)
+	assert.Equal(t, nil, err)
+
+	// check query
+	assert.Equal(t, 1, len(e.selectQueries))
+	assert.Equal(
+		t,
+		joinString(
+			`INSERT INTO "table_test03" ("role_id", "username", "age")`,
+			`VALUES (?, ?, ?) RETURNING "id"`,
+		),
+		e.selectQueries[0],
+	)
+
+	// check args
+	assert.Equal(t, 1, len(e.selectArgs))
+	assert.Equal(t, []any{
+		entity.RoleID, entity.Username, entity.Age,
+	}, e.selectArgs[0])
+
+	// check insert id
+	assert.Equal(t, int64(67), entity.ID)
+}
+
 func TestExecutor_MySQL__Insert_Multi(t *testing.T) {
 	e := newExecTest(t)
 	exec := e.newExecMySQL()
@@ -444,7 +484,7 @@ func TestExecutor_PostgresL__Insert_Multi(t *testing.T) {
 		joinString(
 			`INSERT INTO "table_test03" ("role_id", "username", "age")`,
 			`VALUES (?, ?, ?), (?, ?, ?)`,
-			`RETURNING id`,
+			`RETURNING "id"`,
 		),
 		e.selectQueries[0],
 	)

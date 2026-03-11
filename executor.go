@@ -292,38 +292,7 @@ func (e *Executor[T]) validateUpdateEntity(entity reflect.Value) error {
 }
 
 func (e *Executor[T]) Insert(ctx context.Context, entity *T) error {
-	entityVal := reflect.ValueOf(entity).Elem()
-	if err := e.validateInsertEntity(entityVal); err != nil {
-		return err
-	}
-
-	var buf strings.Builder
-	normalFields, autoIncField := e.buildInsertQuery(&buf)
-	e.buildPlaceholderLen(&buf, len(normalFields))
-
-	args := e.getValuesOfEntity(normalFields, entityVal)
-
-	// execute insert
-	tx := GetTx(ctx)
-	result, err := tx.ExecContext(ctx, buf.String(), args...)
-	if err != nil {
-		return err
-	}
-
-	// TODO support postgres & sqlite3 returning id
-
-	if autoIncField.Valid {
-		autoIncOffset := autoIncField.Data
-		insertID, err := result.LastInsertId()
-		if err != nil {
-			return err
-		}
-
-		indices := e.schema.fieldInfos[autoIncOffset].indices
-		getValueOfStructFieldAt(entityVal, indices).SetInt(insertID)
-	}
-
-	return err
+	return e.insertMultiPerBatch(ctx, []*T{entity})
 }
 
 func (e *Executor[T]) InsertMulti(ctx context.Context, entities []*T) error {
@@ -354,29 +323,12 @@ func (e *Executor[T]) insertMultiPerBatch(ctx context.Context, entities []*T) er
 	}
 
 	// execute insert
-	tx := GetTx(ctx)
 	if e.dialect.withReturningSyntax() && autoIncField.Valid {
-		idOffset := autoIncField.Data
-		buf.WriteString(" RETURNING ")
-		buf.WriteString(e.schema.fieldInfos[idOffset].dbName)
-		var result []int64
-		if err := tx.SelectContext(ctx, &result, buf.String(), allArgs...); err != nil {
-			return err
-		}
-
-		idIndices := e.schema.fieldInfos[idOffset].indices
-		for index, idVal := range result {
-			if index >= len(entities) {
-				return Errorf(0, "id list is bigger than input entities")
-			}
-			entity := entities[index]
-			entityVal := reflect.ValueOf(entity).Elem()
-			getValueOfStructFieldAt(entityVal, idIndices).SetInt(idVal)
-		}
-
-		return nil
+		return e.executeInsertMultiWithReturningSyntax(ctx, &buf, autoIncField, entities, allArgs)
 	}
 
+	// normal execute
+	tx := GetTx(ctx)
 	result, err := tx.ExecContext(ctx, buf.String(), allArgs...)
 	if err != nil {
 		return err
@@ -394,6 +346,36 @@ func (e *Executor[T]) insertMultiPerBatch(ctx context.Context, entities []*T) er
 			entityVal := reflect.ValueOf(entity).Elem()
 			getValueOfStructFieldAt(entityVal, idIndices).SetInt(lastID + int64(i))
 		}
+	}
+
+	return nil
+}
+
+func (e *Executor[T]) executeInsertMultiWithReturningSyntax(
+	ctx context.Context,
+	buf *strings.Builder,
+	autoIncField null.Null[fieldOffsetType],
+	entities []*T,
+	allArgs []any,
+) error {
+	tx := GetTx(ctx)
+
+	idOffset := autoIncField.Data
+	buf.WriteString(" RETURNING ")
+	buf.WriteString(e.quoteIdent(e.schema.fieldInfos[idOffset].dbName))
+	var result []int64
+	if err := tx.SelectContext(ctx, &result, buf.String(), allArgs...); err != nil {
+		return err
+	}
+
+	idIndices := e.schema.fieldInfos[idOffset].indices
+	for index, idVal := range result {
+		if index >= len(entities) {
+			return Errorf(0, "id list is bigger than input entities")
+		}
+		entity := entities[index]
+		entityVal := reflect.ValueOf(entity).Elem()
+		getValueOfStructFieldAt(entityVal, idIndices).SetInt(idVal)
 	}
 
 	return nil
