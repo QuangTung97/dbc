@@ -2,6 +2,7 @@ package postgrescheck
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 
@@ -11,9 +12,10 @@ import (
 
 type InformationColumn struct {
 	Database   string `db:"table_catalog"`
+	Schema     string `db:"table_schema"`
 	Table      string `db:"table_name"`
 	ColumnName string `db:"column_name"`
-	DataType   string `db:"data_type"`
+	DataType   string `db:"udt_name"`
 	IsNullable string `db:"is_nullable"`
 }
 
@@ -24,6 +26,7 @@ func (InformationColumn) TableName() string {
 var InformationColumnSchema = dbc.RegisterSchema(
 	func(s *dbc.Schema[InformationColumn], table *InformationColumn) {
 		dbc.SchemaPrimaryKey(s, &table.Database)
+		dbc.SchemaPrimaryKey(s, &table.Schema)
 		dbc.SchemaPrimaryKey(s, &table.Table)
 		dbc.SchemaPrimaryKey(s, &table.ColumnName)
 
@@ -36,7 +39,7 @@ var InformationColumnSchema = dbc.RegisterSchema(
 // -----------------------------------------------------------------------------------
 
 func NewLoader(db *sqlx.DB, databaseName string) schemacheck.TableLoader {
-	exec, err := dbc.NewExecutor(dbc.DialectMySQL, InformationColumnSchema)
+	exec, err := dbc.NewExecutor(dbc.DialectPostgres, InformationColumnSchema)
 	if err != nil {
 		panic(err)
 	}
@@ -68,9 +71,14 @@ func (s *mysqlLoader) LoadAll(ctx context.Context) ([]schemacheck.TableInfo, err
 func (s *mysqlLoader) loadTableColumnsInfo(ctx context.Context) ([]schemacheck.TableInfo, error) {
 	columnList, err := s.exec.SelectCond(ctx, func(b *dbc.CondBuilder[InformationColumn], table *InformationColumn) {
 		dbc.CondEqual(b, &table.Database, s.databaseName)
+		dbc.CondEqual(b, &table.Schema, "public")
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	for _, col := range columnList {
+		fmt.Println("COL:", col)
 	}
 
 	columnsByTable := map[string][]InformationColumn{}

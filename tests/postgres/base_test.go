@@ -8,7 +8,7 @@ import (
 	postgrescheck "github.com/QuangTung97/dbc/schemacheck/postgres"
 	"tests"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
 //go:embed migrations/*
@@ -20,7 +20,8 @@ func newTestConfig() tests.TestConfig {
 		SubDir:        "migrations",
 		Dialect:       dbc.DialectPostgres,
 
-		DriverName: "mysql",
+		DriverName: "postgres",
+		DSN:        "user=postgres dbname=testdb password=pass sslmode=disable",
 	}
 }
 

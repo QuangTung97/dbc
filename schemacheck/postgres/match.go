@@ -17,13 +17,13 @@ func DefaultMatchColumnType(schemaType reflect.Type, dataType string) bool {
 
 	if schemacheck.KindIsInt(schemaType.Kind()) {
 		switch dataType {
-		case "int", "integer", "smallint", "bigint":
+		case "int4", "int8":
 			return true
 		}
 	}
 
 	if schemaType.Kind() == reflect.Bool {
-		return dataType == "boolean"
+		return dataType == "bool"
 	}
 
 	if schemaType.Kind() == reflect.Struct {
@@ -40,7 +40,7 @@ var _ schemacheck.ColumnTypeMatchFunc = DefaultMatchColumnType
 
 func allowTimeType(dataType string) bool {
 	switch dataType {
-	case "timestamp", "datetime":
+	case "timestamptz":
 		return true
 	}
 	return false

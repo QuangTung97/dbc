@@ -8,6 +8,7 @@ require (
 	github.com/QuangTung97/dbc v0.0.0
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/lib/pq v1.11.2
 	github.com/stretchr/testify v1.11.1
 )
 
