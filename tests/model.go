@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -110,6 +111,12 @@ var globalDB *sqlx.DB
 
 func GetNewDB(conf TestConfig) *sqlx.DB {
 	globalOnce.Do(func() {
+		if conf.Dialect == dbc.DialectSQLite3 {
+			if err := os.RemoveAll(conf.SQLitePath); err != nil {
+				panic(err)
+			}
+		}
+
 		db := sqlx.MustConnect(conf.DriverName, conf.DSN)
 
 		for _, schema := range GetAllSchemasIncludeMigration() {

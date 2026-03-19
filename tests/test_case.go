@@ -27,6 +27,8 @@ type TestConfig struct {
 
 	DriverName string
 	DSN        string
+
+	SQLitePath string
 }
 
 func NewTestCase(_ *testing.T, conf TestConfig) *TestCase {
