@@ -107,17 +107,14 @@ type columnInfo struct {
 }
 
 func (*sqlite3Loader) getTableColumns(ctx context.Context, tableName string) ([]columnInfo, error) {
-	tx := dbc.GetReadonly(ctx)
-
 	query := fmt.Sprintf(`PRAGMA table_info("%s")`, tableName)
-	rows, err := tx.QueryxContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
 	var result []columnInfo
-	for rows.Next() {
+
+	for rows, err := range dbc.QueryxContextIter(ctx, query) {
+		if err != nil {
+			return nil, err
+		}
+
 		var info columnInfo
 		err := rows.Scan(
 			&info.num, &info.name, &info.colType,
@@ -128,8 +125,7 @@ func (*sqlite3Loader) getTableColumns(ctx context.Context, tableName string) ([]
 		}
 		result = append(result, info)
 	}
-
-	return result, rows.Err()
+	return result, nil
 }
 
 type indexInfo struct {
@@ -143,23 +139,19 @@ type indexInfo struct {
 }
 
 func (s *sqlite3Loader) getTableIndexes(ctx context.Context, tableName string) ([]indexInfo, error) {
-	tx := dbc.GetReadonly(ctx)
-
 	query := fmt.Sprintf(`PRAGMA index_list("%s")`, tableName)
-	rows, err := tx.QueryxContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
 	var result []indexInfo
-	for rows.Next() {
+
+	for rows, err := range dbc.QueryxContextIter(ctx, query) {
+		if err != nil {
+			return nil, err
+		}
+
 		var info indexInfo
 		err = rows.Scan(&info.seq, &info.name, &info.unique, &info.origin, &info.partial)
 		if err != nil {
 			return nil, err
 		}
-
 		if info.origin == "pk" {
 			continue
 		}
@@ -168,28 +160,24 @@ func (s *sqlite3Loader) getTableIndexes(ctx context.Context, tableName string) (
 
 	for i := range result {
 		info := &result[i]
-		cols, err := s.getIndexColumns(ctx, info.name)
+		colList, err := s.getIndexColumns(ctx, info.name)
 		if err != nil {
 			return nil, err
 		}
-		info.columns = cols
+		info.columns = colList
 	}
 
-	return result, rows.Err()
+	return result, nil
 }
 
 func (*sqlite3Loader) getIndexColumns(ctx context.Context, indexName string) ([]string, error) {
-	tx := dbc.GetReadonly(ctx)
-
 	query := fmt.Sprintf(`PRAGMA index_info("%s")`, indexName)
-	rows, err := tx.QueryxContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
 	var result []string
-	for rows.Next() {
+	for rows, err := range dbc.QueryxContextIter(ctx, query) {
+		if err != nil {
+			return nil, err
+		}
+
 		var seq int64
 		var cid int64
 		var colName string
@@ -198,6 +186,5 @@ func (*sqlite3Loader) getIndexColumns(ctx context.Context, indexName string) ([]
 		}
 		result = append(result, colName)
 	}
-	return result, rows.Err()
-
+	return result, nil
 }

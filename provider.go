@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"iter"
 	"runtime/debug"
 
 	"github.com/jmoiron/sqlx"
@@ -125,4 +126,30 @@ func (p *providerImpl) Readonly(ctx context.Context) context.Context {
 
 func (p *providerImpl) Autocommit(ctx context.Context) context.Context {
 	return setToContext(ctx, newContextValue(p.db, false))
+}
+
+func QueryxContextIter(ctx context.Context, query string, args ...any) iter.Seq2[*sqlx.Rows, error] {
+	return func(yield func(*sqlx.Rows, error) bool) {
+		tx := GetReadonly(ctx)
+
+		rows, err := tx.QueryxContext(ctx, query, args...)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			if !yield(rows, nil) {
+				return
+			}
+		}
+
+		finalErr := rows.Err()
+		if finalErr != nil {
+			// yield the last error if exists
+			yield(nil, finalErr)
+		}
+	}
 }
