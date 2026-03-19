@@ -38,7 +38,11 @@ func NewTestCase(_ *testing.T, conf TestConfig) *TestCase {
 
 	// truncate all normal table
 	for _, schema := range GetAllSchemas() {
-		tc.DB.MustExec(`TRUNCATE TABLE ` + schema.GetTableName())
+		if conf.Dialect == dbc.DialectSQLite3 {
+			tc.DB.MustExec(`DELETE FROM ` + schema.GetTableName())
+		} else {
+			tc.DB.MustExec(`TRUNCATE TABLE ` + schema.GetTableName())
+		}
 	}
 
 	// init executors
